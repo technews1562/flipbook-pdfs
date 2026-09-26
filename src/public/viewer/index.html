@@ -1,17 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>FlipView PDF — Standalone Interactive Flipbook Reader</title>
-  <meta name="description" content="Read digital magazines, brochures, portfolios, and reports in an interactive 3D canvas flipbook viewer powered by FlipView." />
+  <title>FlipView PDF — Interactive 3D Flipbook Reader</title>
+  <meta name="description" content="Read digital magazines, brochures, portfolios, catalogs, and reports in an interactive 3D canvas flipbook viewer powered by FlipView." />
 
   <!-- Google Fonts: Plus Jakarta Sans & Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-  <!-- Core Viewer Styles -->
+  <!-- Core Viewer Styles (Heyzine Light Aesthetic) -->
   <link rel="stylesheet" href="/viewer/viewer.css" />
 </head>
 <body>
@@ -38,11 +38,11 @@
       <!-- Center Zoom Controls -->
       <div class="fv-header__center">
         <div class="fv-zoom-group">
-          <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvZoomOutBtn" title="Zoom Out" aria-label="Zoom Out">
+          <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvZoomOutBtn" title="Zoom Out (-)" aria-label="Zoom Out">
             <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
           </button>
           <button class="fv-zoom-label" id="fvZoomLevel" title="Reset Zoom" aria-label="Reset Zoom">100%</button>
-          <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvZoomInBtn" title="Zoom In" aria-label="Zoom In">
+          <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvZoomInBtn" title="Zoom In (+)" aria-label="Zoom In">
             <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
           </button>
         </div>
@@ -50,6 +50,12 @@
 
       <!-- Right Utility Controls -->
       <div class="fv-header__right">
+        <!-- Sound Toggle Button -->
+        <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvSoundBtn" title="Toggle Page Flip Sound (M)" aria-label="Toggle Sound">
+          <svg id="fvSoundIconOn" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+          <svg id="fvSoundIconOff" viewBox="0 0 24 24" style="display:none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+        </button>
+
         <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvSearchBtn" title="Search in Document" aria-label="Search">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         </button>
@@ -74,6 +80,17 @@
           <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         </button>
 
+        <!-- Theme Toggle Button -->
+        <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvThemeToggleBtn" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">
+          <svg id="fvThemeIconSun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          <svg id="fvThemeIconMoon" viewBox="0 0 24 24" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
+
+        <!-- Mobile Menu Trigger Button (Visible on screens <= 768px) -->
+        <button class="fv-tool-btn fv-tool-btn--icon-only fv-mobile-menu-btn" id="fvMobileMenuBtn" title="More Options" aria-label="More Options">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
+        </button>
+
         <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvFullscreenBtn" title="Toggle Fullscreen (F)" aria-label="Fullscreen">
           <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
         </button>
@@ -87,7 +104,7 @@
         <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
 
-      <!-- Centered Viewport & Book Container -->
+      <!-- Centered Viewport & Book Container with Heyzine 3D Stage -->
       <div class="fv-viewport" id="fvViewport">
         <div class="fv-book-container" id="fvBookContainer">
           <!-- Flipbook rendered dynamically by StPageFlip & PDF.js -->
@@ -99,7 +116,7 @@
         <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </button>
 
-      <!-- Floating Bottom Dock Controls -->
+      <!-- Floating Bottom Dock Controls (Glassmorphic) -->
       <div class="fv-dock-wrap">
         <nav class="fv-dock" aria-label="Reader Navigation">
           <button class="fv-dock-btn" id="fvFirstBtn" title="First Page (Home)" aria-label="First Page">
@@ -137,7 +154,7 @@
     <div class="fv-thumbnails-tray" id="fvThumbnailsTray">
       <div class="fv-tray-header">
         <span>PAGE PREVIEWS</span>
-        <button id="fvCloseTrayBtn" style="color:var(--fv-text-muted); cursor:pointer;">✕ Close</button>
+        <button id="fvCloseTrayBtn" class="fv-tray-close">✕ Close</button>
       </div>
       <div class="fv-thumb-scroll" id="fvThumbScroll"></div>
     </div>
@@ -145,11 +162,11 @@
     <!-- Slide-In Info Drawer -->
     <aside class="fv-drawer" id="fvInfoDrawer" aria-label="Publication Details">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
-        <h3 style="font-size:1.15rem; font-weight:800;">Publication Info</h3>
+        <h3 style="font-size:1.15rem; font-weight:800; color:var(--fv-text);">Publication Info</h3>
         <button id="fvCloseDrawerBtn" style="font-size:1.2rem; color:var(--fv-text-muted); cursor:pointer;">✕</button>
       </div>
       <span class="fv-category-pill" id="fvInfoCategory" style="display:inline-block; margin-bottom:12px;">Magazine</span>
-      <h2 id="fvInfoTitle" style="font-size:1.35rem; font-weight:800; margin-bottom:8px; line-height:1.3;">-</h2>
+      <h2 id="fvInfoTitle" style="font-size:1.35rem; font-weight:800; margin-bottom:8px; line-height:1.3; color:var(--fv-text);">-</h2>
       <p id="fvInfoAuthor" style="font-size:0.88rem; color:var(--fv-primary); font-weight:600; margin-bottom:14px;"></p>
       <p id="fvInfoPages" style="font-size:0.82rem; color:var(--fv-text-muted); margin-bottom:18px;"></p>
       <div id="fvInfoDesc" style="font-size:0.92rem; color:var(--fv-text-muted); line-height:1.65; white-space:pre-wrap;"></div>
@@ -158,8 +175,8 @@
     <!-- Loading State Overlay -->
     <div class="fv-overlay" id="fvLoader">
       <div class="fv-spinner"></div>
-      <h2 style="font-size:1.3rem; font-weight:800; margin-bottom:6px;" id="fvLoaderTitle">Loading Flipbook...</h2>
-      <p style="font-size:0.9rem; color:var(--fv-text-muted); max-width:400px;" id="fvLoaderDesc">Rendering high-resolution vector canvas pages.</p>
+      <h2 style="font-size:1.3rem; font-weight:800; margin-bottom:6px; color:var(--fv-text);" id="fvLoaderTitle">Loading Flipbook...</h2>
+      <p style="font-size:0.9rem; color:var(--fv-text-muted); max-width:400px; text-align:center;" id="fvLoaderDesc">Rendering high-resolution vector canvas pages.</p>
       <div class="fv-progress-bar">
         <div class="fv-progress-fill" id="fvLoaderFill"></div>
       </div>
@@ -168,8 +185,8 @@
     <!-- Error State Overlay -->
     <div class="fv-overlay" id="fvErrorOverlay" style="display:none;">
       <div class="fv-card-icon" id="fvErrorIcon">⚠️</div>
-      <h2 style="font-size:1.35rem; font-weight:800; margin-bottom:8px;" id="fvErrorTitle">Flipbook Notice</h2>
-      <p style="font-size:0.92rem; color:var(--fv-text-muted); max-width:420px; line-height:1.6; margin-bottom:20px;" id="fvErrorDesc">
+      <h2 style="font-size:1.35rem; font-weight:800; margin-bottom:8px; color:var(--fv-text);" id="fvErrorTitle">Flipbook Notice</h2>
+      <p style="font-size:0.92rem; color:var(--fv-text-muted); max-width:420px; line-height:1.6; margin-bottom:20px; text-align:center;" id="fvErrorDesc">
         Unable to load the publication.
       </p>
       <button class="fv-btn-primary" id="fvErrorActionBtn" style="max-width:200px;" onclick="window.location.reload();">Retry</button>
@@ -184,7 +201,7 @@
         <div class="fv-input-group">
           <input type="password" class="fv-input" id="fvPasswordInput" placeholder="Enter password..." autocomplete="current-password" />
         </div>
-        <p id="fvPasswordError" style="display:none; color:var(--fv-danger); font-size:0.86rem; font-weight:600; margin-bottom:14px;"></p>
+        <p id="fvPasswordError" style="display:none; color:var(--fv-danger); font-size:0.86rem; font-weight:600; margin-bottom:14px; text-align:center;"></p>
         <button class="fv-btn-primary" id="fvPasswordBtn">Unlock & Read Flipbook</button>
       </div>
     </div>
@@ -212,7 +229,7 @@
           <button class="fv-modal-close" style="font-size:1.2rem; cursor:pointer;">✕</button>
         </div>
         <p style="font-size:0.88rem; color:var(--fv-text-muted); margin-bottom:18px;">Scan with any mobile smartphone camera to open and read instantly:</p>
-        <div style="display:inline-block; padding:16px; background:#ffffff; border-radius:12px; margin-bottom:18px;">
+        <div style="display:inline-block; padding:16px; background:#ffffff; border-radius:12px; margin-bottom:18px; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
           <canvas id="fvQrCanvas"></canvas>
         </div>
         <div>
@@ -232,6 +249,51 @@
           <input type="text" class="fv-input" id="fvSearchInput" placeholder="Type keyword and press Enter..." />
         </div>
         <div id="fvSearchResults" style="max-height:240px; overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- Mobile Options Bottom Sheet -->
+    <div class="fv-modal-overlay fv-sheet-overlay" id="fvMobileSheetModal">
+      <div class="fv-mobile-sheet">
+        <div class="fv-mobile-sheet__handle"></div>
+        <div class="fv-mobile-sheet__header">
+          <h3 style="font-size:1.05rem; font-weight:800; color:var(--fv-text);">Reader Options</h3>
+          <button class="fv-modal-close" style="font-size:1.2rem; cursor:pointer; color:var(--fv-text-muted);">✕</button>
+        </div>
+        <div class="fv-mobile-grid">
+          <button class="fv-mobile-grid-btn" id="fvMobileSearchBtn">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <span>Search</span>
+          </button>
+          <button class="fv-mobile-grid-btn" id="fvMobileThumbnailsBtn">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <span>Pages</span>
+          </button>
+          <button class="fv-mobile-grid-btn" id="fvMobileSoundBtn">
+            <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+            <span id="fvMobileSoundLabel">Sound: On</span>
+          </button>
+          <button class="fv-mobile-grid-btn" id="fvMobileThemeBtn">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line></svg>
+            <span id="fvMobileThemeLabel">Theme</span>
+          </button>
+          <button class="fv-mobile-grid-btn" id="fvMobileShareBtn">
+            <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line></svg>
+            <span>Share</span>
+          </button>
+          <button class="fv-mobile-grid-btn" id="fvMobileQrBtn">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <span>QR Code</span>
+          </button>
+          <button class="fv-mobile-grid-btn" id="fvMobileDownloadBtn" style="display:none;">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline></svg>
+            <span>Download</span>
+          </button>
+          <button class="fv-mobile-grid-btn" id="fvMobileInfoBtn">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line></svg>
+            <span>Details</span>
+          </button>
+        </div>
       </div>
     </div>
 
