@@ -137,6 +137,55 @@ router.post('/logout', async (req, res) => {
 });
 
 // -------------------------------------------------------------
+// POST /api/auth/forgot-password
+// -------------------------------------------------------------
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const result = await authService.requestPasswordReset(email);
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'FORGOT_PASSWORD_FAILED', message: err.message }
+    });
+  }
+});
+
+// -------------------------------------------------------------
+// POST /api/auth/reset-password
+// -------------------------------------------------------------
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, code, new_password, client_type } = req.body;
+    const ip_address = req.ip || req.headers['x-forwarded-for'] || '';
+    const user_agent = req.headers['user-agent'] || '';
+
+    const result = await authService.resetPasswordWithCode({
+      email,
+      code,
+      new_password,
+      client_type,
+      ip_address,
+      user_agent
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'RESET_PASSWORD_FAILED', message: err.message }
+    });
+  }
+});
+
+// -------------------------------------------------------------
 // GET /api/auth/plans (Public Plans Information)
 // -------------------------------------------------------------
 router.get('/plans', (req, res) => {

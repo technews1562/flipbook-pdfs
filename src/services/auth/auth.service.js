@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const config = require('../../config');
 const db = require('../../db/database');
+const emailService = require('../email/email.service');
 
 class AuthService {
   /**
@@ -232,6 +233,99 @@ class AuthService {
     } catch (e) {
       return false;
     }
+  }
+
+  /**
+   * Request a 6-digit password reset verification code
+   */
+  async requestPasswordReset(email) {
+    if (!email || !email.includes('@')) {
+      throw new Error('Please provide a valid email address.');
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    const user = db.getUserByEmail(cleanEmail);
+
+    if (!user) {
+      // Do not reveal whether user exists for security, return positive message
+      return {
+        message: 'If an account with that email exists, a verification code has been sent.'
+      };
+    }
+
+    // Generate cryptographically secure 6-digit code
+    const code = Math.floor(100000 + crypto.randomInt(0, 900000)).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+    db.createPasswordReset({
+      email: cleanEmail,
+      code,
+      expires_at: expiresAt
+    });
+
+    // Send email asynchronously
+    emailService.sendPasswordResetEmail(cleanEmail, code, user.full_name).catch(err => {
+      console.error('[AuthService] Failed to send password reset email:', err.message);
+    });
+
+    return {
+      message: 'If an account with that email exists, a verification code has been sent.'
+    };
+  }
+
+  /**
+   * Reset user password using verification code
+   */
+  async resetPasswordWithCode({ email, code, new_password, client_type = 'WEB', ip_address = '', user_agent = '' }) {
+    if (!email || !email.includes('@')) {
+      throw new Error('Please provide a valid email address.');
+    }
+    if (!code || String(code).trim().length !== 6) {
+      throw new Error('Please provide a valid 6-digit verification code.');
+    }
+    if (!new_password || typeof new_password !== 'string' || new_password.length < 6) {
+      throw new Error('New password must be at least 6 characters long.');
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = String(code).trim();
+
+    const resetRecord = db.getPasswordReset(cleanEmail, cleanCode);
+    if (!resetRecord) {
+      throw new Error('Invalid or expired verification code. Please request a new code.');
+    }
+
+    const user = db.getUserByEmail(cleanEmail);
+    if (!user) {
+      throw new Error('User account not found.');
+    }
+
+    // Hash new password and update user
+    const newPasswordHash = await this.hashPassword(new_password);
+    db.updateUser(user.id, { password_hash: newPasswordHash });
+
+    // Revoke previous sessions & remove used reset code
+    db.deleteUserSessions(user.id);
+    db.deletePasswordReset(cleanEmail);
+
+    // Automatically generate new session & tokens for seamless user experience
+    const updatedUser = db.getUserById(user.id);
+    const tokens = this.generateTokens(updatedUser);
+
+    db.createSession({
+      user_id: user.id,
+      token_hash: tokens.tokenHash,
+      client_type,
+      ip_address,
+      user_agent,
+      expires_at: tokens.expiresAt
+    });
+
+    return {
+      user: this.sanitizeUser(updatedUser),
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      message: 'Password reset successfully. You are now logged in.'
+    };
   }
 }
 

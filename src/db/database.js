@@ -16,6 +16,7 @@ const jsonSessionsPath = path.join(dbDir, 'sessions-store.json');
 const jsonPlansPath = path.join(dbDir, 'plans-store.json');
 const jsonUploadSessionsPath = path.join(dbDir, 'upload-sessions-store.json');
 const jsonAnalyticsEventsPath = path.join(dbDir, 'analytics-events-store.json');
+const jsonPasswordResetsPath = path.join(dbDir, 'password-resets-store.json');
 
 // In-Memory Data Stores (Fallback & Sync)
 let memoryStore = [];
@@ -24,6 +25,7 @@ let sessionsStore = [];
 let plansStore = [];
 let uploadSessionsStore = [];
 let analyticsEventsStore = [];
+let passwordResetsStore = [];
 
 let storageService = null;
 function getStorageService() {
@@ -105,6 +107,9 @@ function loadJsonStore() {
     if (fs.existsSync(jsonAnalyticsEventsPath)) {
       analyticsEventsStore = JSON.parse(fs.readFileSync(jsonAnalyticsEventsPath, 'utf8'));
     }
+    if (fs.existsSync(jsonPasswordResetsPath)) {
+      passwordResetsStore = JSON.parse(fs.readFileSync(jsonPasswordResetsPath, 'utf8'));
+    }
   } catch (e) {
     console.warn('[DB] Failed to load JSON store:', e.message);
   }
@@ -154,6 +159,7 @@ function saveJsonStore() {
     fs.writeFileSync(jsonPlansPath, JSON.stringify(plansStore, null, 2), 'utf8');
     fs.writeFileSync(jsonUploadSessionsPath, JSON.stringify(uploadSessionsStore, null, 2), 'utf8');
     fs.writeFileSync(jsonAnalyticsEventsPath, JSON.stringify(analyticsEventsStore, null, 2), 'utf8');
+    fs.writeFileSync(jsonPasswordResetsPath, JSON.stringify(passwordResetsStore, null, 2), 'utf8');
   } catch (e) {
     console.warn('[DB] Failed to persist JSON stores:', e.message);
   }
@@ -310,6 +316,17 @@ try {
       country TEXT,
       created_at TEXT NOT NULL,
       FOREIGN KEY(publication_id) REFERENCES publications(id) ON DELETE CASCADE
+    );
+  `);
+
+  // 7. Password Resets Table
+  sqliteDb.exec(`
+    CREATE TABLE IF NOT EXISTS password_resets (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      code TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
     );
   `);
 
@@ -616,6 +633,75 @@ module.exports = {
       } catch (e) {}
     }
     sessionsStore = sessionsStore.filter(s => s.user_id !== userId);
+    saveJsonStore();
+    return true;
+  },
+
+  // -------------------------------------------------------------
+  // PASSWORD RESETS METHODS
+  // -------------------------------------------------------------
+  createPasswordReset({ email, code, expires_at }) {
+    const now = new Date().toISOString();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const resetRecord = {
+      id: `rst_${Date.now().toString(36)}${Math.random().toString(36).substring(2, 7)}`,
+      email: cleanEmail,
+      code: String(code).trim(),
+      expires_at: expires_at || new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      created_at: now
+    };
+
+    // Remove any existing active codes for this email
+    this.deletePasswordReset(cleanEmail);
+
+    if (sqliteDb) {
+      try {
+        sqliteDb.prepare(`
+          INSERT INTO password_resets (id, email, code, expires_at, created_at)
+          VALUES (@id, @email, @code, @expires_at, @created_at)
+        `).run(resetRecord);
+      } catch (e) {
+        console.warn('[DB Password Reset insert error]', e.message);
+      }
+    }
+
+    passwordResetsStore.unshift(resetRecord);
+    saveJsonStore();
+    return resetRecord;
+  },
+
+  getPasswordReset(email, code) {
+    if (!email || !code) return null;
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = String(code).trim();
+    const now = new Date().toISOString();
+
+    if (sqliteDb) {
+      try {
+        const row = sqliteDb.prepare(`
+          SELECT * FROM password_resets
+          WHERE LOWER(email) = LOWER(?) AND code = ? AND expires_at > ?
+          ORDER BY created_at DESC
+          LIMIT 1
+        `).get(cleanEmail, cleanCode, now);
+        if (row) return row;
+      } catch (e) {}
+    }
+
+    return passwordResetsStore.find(
+      r => (r.email || '').toLowerCase() === cleanEmail && r.code === cleanCode && r.expires_at > now
+    ) || null;
+  },
+
+  deletePasswordReset(email) {
+    if (!email) return false;
+    const cleanEmail = email.trim().toLowerCase();
+    if (sqliteDb) {
+      try {
+        sqliteDb.prepare('DELETE FROM password_resets WHERE LOWER(email) = LOWER(?)').run(cleanEmail);
+      } catch (e) {}
+    }
+    passwordResetsStore = passwordResetsStore.filter(r => (r.email || '').toLowerCase() !== cleanEmail);
     saveJsonStore();
     return true;
   },

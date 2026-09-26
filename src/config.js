@@ -37,9 +37,19 @@ module.exports = {
     resendApiKey: process.env.RESEND_API_KEY || '',
     postEmail: process.env.BLOGGER_POST_EMAIL || '',
     smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
-    smtpPort: parseInt(process.env.SMTP_PORT, 10) || 465,
-    smtpUser: process.env.SMTP_USER || '',
-    smtpPass: process.env.SMTP_PASS || ''
+    smtpPort: parseInt(process.env.SMTP_PORT, 10) || 587,
+    smtpUser: process.env.SMTP_USER || 'technews1562@gmail.com',
+    smtpPass: process.env.SMTP_PASS || 'unxkuzpunhknpadt'
+  },
+
+  // Email Notification Settings
+  email: {
+    smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
+    smtpPort: parseInt(process.env.SMTP_PORT, 10) || 587,
+    smtpUser: process.env.SMTP_USER || 'technews1562@gmail.com',
+    smtpPass: process.env.SMTP_PASS || 'unxkuzpunhknpadt',
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    fromAddress: process.env.EMAIL_FROM || '"FlipView" <technews1562@gmail.com>'
   },
 
   // Admin Security
