@@ -186,6 +186,30 @@ router.post('/reset-password', async (req, res) => {
 });
 
 // -------------------------------------------------------------
+// POST /api/auth/sync-subscription (Requires Auth)
+// -------------------------------------------------------------
+router.post('/sync-subscription', requireAuth, async (req, res) => {
+  try {
+    const { plan_id, store_product_id, is_active } = req.body;
+    const result = await authService.syncSubscription(req.user.id, {
+      planId: plan_id,
+      storeProductId: store_product_id,
+      isActive: is_active !== false
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'SYNC_SUBSCRIPTION_FAILED', message: err.message }
+    });
+  }
+});
+
+// -------------------------------------------------------------
 // GET /api/auth/plans (Public Plans Information)
 // -------------------------------------------------------------
 router.get('/plans', (req, res) => {

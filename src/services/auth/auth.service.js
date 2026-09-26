@@ -326,6 +326,38 @@ class AuthService {
       message: 'Password reset successfully. You are now logged in.'
     };
   }
+
+  /**
+   * Sync Microsoft Store Subscription to user account
+   */
+  async syncSubscription(userId, { planId = 'free', storeProductId = '', isActive = true }) {
+    if (!userId) {
+      throw new Error('User ID is required.');
+    }
+
+    const user = db.getUserById(userId);
+    if (!user) {
+      throw new Error('User account not found.');
+    }
+
+    const targetPlanId = isActive ? (planId || 'free').toLowerCase() : 'free';
+    const plan = db.getPlanById(targetPlanId);
+    if (!plan) {
+      throw new Error(`Plan '${targetPlanId}' not found.`);
+    }
+
+    const updatedUser = db.updateUser(userId, {
+      plan_id: plan.id,
+      store_product_id: storeProductId || user.store_product_id || '',
+      subscription_status: isActive ? 'ACTIVE' : 'EXPIRED'
+    });
+
+    return {
+      user: this.sanitizeUser(updatedUser),
+      plan: plan,
+      message: `Account plan synchronized to ${plan.name}.`
+    };
+  }
 }
 
 module.exports = new AuthService();
