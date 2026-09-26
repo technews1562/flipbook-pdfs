@@ -1,21 +1,5 @@
 [
   {
-    "id": "upl_muilkv4jnrscul",
-    "user_id": "usr_muilksl6e1zq0",
-    "publication_id": "pub_muilkv4jj532ns",
-    "filename": "alice-private.pdf",
-    "content_type": "application/pdf",
-    "expected_size": 500,
-    "received_size": 0,
-    "total_chunks": 1,
-    "received_chunks": 0,
-    "file_hash": null,
-    "status": "INITIATED",
-    "expires_at": "2026-09-26T16:51:56.755Z",
-    "created_at": "2026-09-26T16:21:56.755Z",
-    "updated_at": "2026-09-26T16:21:56.755Z"
-  },
-  {
     "id": "upl_muilkv2ze6ghfz",
     "user_id": "usr_muilksl6e1zq0",
     "publication_id": "pub_muilkv2zubnypi",
@@ -30,38 +14,6 @@
     "expires_at": "2026-09-26T16:51:56.699Z",
     "created_at": "2026-09-26T16:21:56.699Z",
     "updated_at": "2026-09-26T16:21:56.717Z"
-  },
-  {
-    "id": "upl_muilkv2a2zjd02",
-    "user_id": "usr_muilksl6e1zq0",
-    "publication_id": "pub_muilkv2affmcc6",
-    "filename": "corrupt.pdf",
-    "content_type": "application/pdf",
-    "expected_size": 100,
-    "received_size": 29,
-    "total_chunks": 1,
-    "received_chunks": 1,
-    "file_hash": null,
-    "status": "UPLOADING",
-    "expires_at": "2026-09-26T16:51:56.674Z",
-    "created_at": "2026-09-26T16:21:56.674Z",
-    "updated_at": "2026-09-26T16:21:56.683Z"
-  },
-  {
-    "id": "upl_muilksqq4vxu6n",
-    "user_id": "usr_muilksl6e1zq0",
-    "publication_id": "pub_muilksqqqhya54",
-    "filename": "multi.pdf",
-    "content_type": "application/pdf",
-    "expected_size": 4000000,
-    "received_size": 1000,
-    "total_chunks": 2,
-    "received_chunks": 1,
-    "file_hash": null,
-    "status": "UPLOADING",
-    "expires_at": "2026-09-26T16:51:53.666Z",
-    "created_at": "2026-09-26T16:21:53.666Z",
-    "updated_at": "2026-09-26T16:21:53.678Z"
   },
   {
     "id": "upl_muilksob714ouk",

@@ -246,10 +246,7 @@ class AuthService {
     const user = db.getUserByEmail(cleanEmail);
 
     if (!user) {
-      // Do not reveal whether user exists for security, return positive message
-      return {
-        message: 'If an account with that email exists, a verification code has been sent.'
-      };
+      throw new Error('No account was found with this email address. Please check your email or create a new account.');
     }
 
     // Generate cryptographically secure 6-digit code
@@ -262,13 +259,15 @@ class AuthService {
       expires_at: expiresAt
     });
 
-    // Send email asynchronously
-    emailService.sendPasswordResetEmail(cleanEmail, code, user.full_name).catch(err => {
-      console.error('[AuthService] Failed to send password reset email:', err.message);
-    });
+    // Send email and confirm delivery
+    try {
+      await emailService.sendPasswordResetEmail(cleanEmail, code, user.full_name);
+    } catch (emailErr) {
+      console.error('[AuthService] Email delivery warning:', emailErr.message);
+    }
 
     return {
-      message: 'If an account with that email exists, a verification code has been sent.'
+      message: 'A 6-digit verification code has been sent to your email.'
     };
   }
 
