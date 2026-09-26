@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlipView Cloud Studio &amp; Admin Dashboard</title>
+  <link rel="stylesheet" href="admin.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">📖</div>
+        <div>
+          <h2 class="brand-name">FlipView</h2>
+          <span class="brand-badge">Cloud Admin</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="publications">
+          <span class="nav-icon">📚</span> Publications
+        </button>
+        <button class="nav-item" data-tab="upload">
+          <span class="nav-icon">⬆️</span> Upload &amp; Publish
+        </button>
+        <button class="nav-item" data-tab="migration">
+          <span class="nav-icon">🔄</span> GitHub Migration
+        </button>
+        <button class="nav-item" data-tab="settings">
+          <span class="nav-icon">⚙️</span> Settings &amp; API
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="system-status">
+          <span class="status-dot online"></span>
+          <span>API: Online</span>
+        </div>
+        <div class="version">FlipView v2.0 • R2 + SQLite</div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="topbar-title" id="pageTitle">Publications Library</div>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary" id="refreshBtn">🔄 Refresh</button>
+          <button class="btn btn-primary" id="newPubBtn">+ New Publication</button>
+        </div>
+      </header>
+
+      <!-- Stats Bar -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Publications</div>
+          <div class="stat-value" id="statTotalPubs">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Live on Blogger</div>
+          <div class="stat-value text-success" id="statPublished">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Blogger Pending</div>
+          <div class="stat-value text-warning" id="statPending">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Storage</div>
+          <div class="stat-value" id="statStorage">0 MB</div>
+        </div>
+      </div>
+
+      <!-- Tab: Publications -->
+      <section class="tab-content active" id="tab-publications">
+        <div class="table-toolbar">
+          <input type="text" id="searchPubs" class="form-input search-input" placeholder="🔍 Search publications by title, category, author..." />
+          <select id="filterCategory" class="form-select">
+            <option value="all">All Categories</option>
+          </select>
+        </div>
+
+        <div class="table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Cover</th>
+                <th>Title &amp; ID</th>
+                <th>Category</th>
+                <th>Pages</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="publicationsTableBody">
+              <tr>
+                <td colspan="7" class="text-center">Loading publications...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Tab: Upload -->
+      <section class="tab-content" id="tab-upload">
+        <div class="card upload-card">
+          <h3>Publish Digital PDF Publication</h3>
+          <p class="subtitle">Upload a PDF document. It will be stored in Cloudflare R2, assigned a unique ID, and auto-published to your Blogger site.</p>
+
+          <div class="dropzone" id="adminDropzone">
+            <input type="file" id="adminPdfInput" accept="application/pdf" style="display:none;" />
+            <div class="drop-icon">📄</div>
+            <div class="drop-text" id="dropText">Drag &amp; drop your PDF here or <span>browse files</span></div>
+            <div class="drop-sub">PDF files up to 250MB supported</div>
+          </div>
+
+          <form id="adminUploadForm" class="upload-form">
+            <div class="form-group">
+              <label>Publication Title</label>
+              <input type="text" id="adminTitle" class="form-input" placeholder="e.g. Summer Fashion Magazine 2026" required />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Category</label>
+                <select id="adminCategory" class="form-select">
+                  <option value="Magazine">Magazine</option>
+                  <option value="Brochure">Brochure</option>
+                  <option value="Annual Report">Annual Report</option>
+                  <option value="Catalogue">Catalogue</option>
+                  <option value="Portfolio">Portfolio</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Author / Organization</label>
+                <input type="text" id="adminAuthor" class="form-input" placeholder="e.g. Editorial Board" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Description</label>
+              <textarea id="adminDescription" class="form-textarea" rows="3" placeholder="Brief overview of this publication..."></textarea>
+            </div>
+
+            <div class="progress-box" id="adminProgressBox" style="display:none;">
+              <div class="progress-header">
+                <span id="adminProgressStatus">Uploading...</span>
+                <span id="adminProgressPct">0%</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" id="adminProgressFill"></div>
+              </div>
+              <div class="progress-desc" id="adminProgressDesc"></div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="adminSubmitBtn">🚀 Upload &amp; Publish</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Tab: Migration -->
+      <section class="tab-content" id="tab-migration">
+        <div class="card">
+          <h3>GitHub to Cloudflare R2 Migration Tool</h3>
+          <p class="subtitle">Enumerate all legacy PDFs from your GitHub repository (<code>technews1562/flipbook-pdfs</code>), transfer them securely to Cloudflare R2, extract metadata, generate cover previews, and save them in the SQLite database.</p>
+
+          <div class="migration-panel">
+            <div class="form-group">
+              <label>GitHub Repository</label>
+              <input type="text" id="migRepo" class="form-input" value="technews1562/flipbook-pdfs" />
+            </div>
+            <div class="form-group">
+              <label>GitHub Token (Optional if repo is public)</label>
+              <input type="password" id="migToken" class="form-input" placeholder="ghp_..." />
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-secondary" id="migDryRunBtn">🔍 Preview Scan (Dry Run)</button>
+              <button class="btn btn-primary" id="migStartBtn">⚡ Start Full Migration</button>
+            </div>
+          </div>
+
+          <div class="log-terminal" id="migTerminal" style="display:none;">
+            <div class="terminal-head">Migration Output Console</div>
+            <pre class="terminal-body" id="migLog"></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab: Settings -->
+      <section class="tab-content" id="tab-settings">
+        <div class="card">
+          <h3>System &amp; API Configuration</h3>
+          <p class="subtitle">Overview of current environment setup and integration status.</p>
+
+          <div class="settings-list">
+            <div class="setting-item">
+              <div>
+                <strong>Blogger Blog ID</strong>
+                <div class="text-muted">Target Blogger site destination</div>
+              </div>
+              <code id="cfgBlogId">5830475951713053686</code>
+            </div>
+            <div class="setting-item">
+              <div>
+                <strong>Storage Provider</strong>
+                <div class="text-muted">Cloudflare R2 Object Storage</div>
+              </div>
+              <span class="badge badge-success">Active</span>
+            </div>
+            <div class="setting-item">
+              <div>
+                <strong>Database Engine</strong>
+                <div class="text-muted">SQLite (WAL Mode)</div>
+              </div>
+              <span class="badge badge-success">Connected</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

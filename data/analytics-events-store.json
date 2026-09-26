@@ -1,0 +1,222 @@
+[
+  {
+    "id": "evt_muijge2kd5oes",
+    "publication_id": "pub_test_public_01",
+    "event_type": "QR_SCAN",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:22:28.796Z"
+  },
+  {
+    "id": "evt_muijge2dcykyx",
+    "publication_id": "pub_test_public_01",
+    "event_type": "SHARE",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:22:28.789Z"
+  },
+  {
+    "id": "evt_muijge2629d5q",
+    "publication_id": "pub_test_public_01",
+    "event_type": "DOWNLOAD",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:22:28.782Z"
+  },
+  {
+    "id": "evt_muijge20ti9ec",
+    "publication_id": "pub_test_public_01",
+    "event_type": "PAGE_TURN",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:22:28.776Z"
+  },
+  {
+    "id": "evt_muijge1s890zz",
+    "publication_id": "pub_test_public_01",
+    "event_type": "VIEW",
+    "page_number": null,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:22:28.768Z"
+  },
+  {
+    "id": "evt_muijedhy2fi4u",
+    "publication_id": "pub_test_public_01",
+    "event_type": "QR_SCAN",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:20:54.742Z"
+  },
+  {
+    "id": "evt_muijedhq90224",
+    "publication_id": "pub_test_public_01",
+    "event_type": "SHARE",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:20:54.734Z"
+  },
+  {
+    "id": "evt_muijedhiyvl0x",
+    "publication_id": "pub_test_public_01",
+    "event_type": "DOWNLOAD",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:20:54.726Z"
+  },
+  {
+    "id": "evt_muijedhazg3cc",
+    "publication_id": "pub_test_public_01",
+    "event_type": "PAGE_TURN",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:20:54.718Z"
+  },
+  {
+    "id": "evt_muijedh148n8u",
+    "publication_id": "pub_test_public_01",
+    "event_type": "VIEW",
+    "page_number": null,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:20:54.709Z"
+  },
+  {
+    "id": "evt_muijcapo9cj0g",
+    "publication_id": "pub_test_public_01",
+    "event_type": "QR_SCAN",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:19:17.820Z"
+  },
+  {
+    "id": "evt_muijcapfvy7tg",
+    "publication_id": "pub_test_public_01",
+    "event_type": "SHARE",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:19:17.811Z"
+  },
+  {
+    "id": "evt_muijcap81c6s9",
+    "publication_id": "pub_test_public_01",
+    "event_type": "DOWNLOAD",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:19:17.804Z"
+  },
+  {
+    "id": "evt_muijcaozbk7y4",
+    "publication_id": "pub_test_public_01",
+    "event_type": "PAGE_TURN",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:19:17.795Z"
+  },
+  {
+    "id": "evt_muijcaoqai9ju",
+    "publication_id": "pub_test_public_01",
+    "event_type": "VIEW",
+    "page_number": null,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:19:17.786Z"
+  },
+  {
+    "id": "evt_muijaz9zsh170",
+    "publication_id": "pub_test_public_01",
+    "event_type": "QR_SCAN",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:18:16.343Z"
+  },
+  {
+    "id": "evt_muijaz9qed42u",
+    "publication_id": "pub_test_public_01",
+    "event_type": "SHARE",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:18:16.334Z"
+  },
+  {
+    "id": "evt_muijaz9i5afgn",
+    "publication_id": "pub_test_public_01",
+    "event_type": "DOWNLOAD",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:18:16.326Z"
+  },
+  {
+    "id": "evt_muijaz99lb2sa",
+    "publication_id": "pub_test_public_01",
+    "event_type": "PAGE_TURN",
+    "page_number": 2,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:18:16.317Z"
+  },
+  {
+    "id": "evt_muijaz90sffoz",
+    "publication_id": "pub_test_public_01",
+    "event_type": "VIEW",
+    "page_number": null,
+    "duration_seconds": null,
+    "referrer": "",
+    "user_agent": "",
+    "country": "",
+    "created_at": "2026-09-26T15:18:16.308Z"
+  }
+]

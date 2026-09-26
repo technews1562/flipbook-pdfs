@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>FlipView PDF — Standalone Interactive Flipbook Reader</title>
+  <meta name="description" content="Read digital magazines, brochures, portfolios, and reports in an interactive 3D canvas flipbook viewer powered by FlipView." />
+
+  <!-- Google Fonts: Plus Jakarta Sans & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Core Viewer Styles -->
+  <link rel="stylesheet" href="/viewer/viewer.css" />
+</head>
+<body>
+
+  <div class="fv-viewer">
+
+    <!-- Top Reader Navigation Chrome -->
+    <header class="fv-header">
+      <div class="fv-header__left">
+        <!-- Subtle FlipView Brand Badge -->
+        <div class="fv-brand-badge" id="fvBrandBadge" title="Powered by FlipView Cloud">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6zm2 0v12h12V6H6zm2 2h8v2H8V8zm0 4h8v2H8v-2z"/>
+          </svg>
+          <span>FlipView</span>
+        </div>
+
+        <div class="fv-doc-info">
+          <h1 class="fv-doc-title" id="fvDocTitle">Loading Publication...</h1>
+          <span class="fv-category-pill" id="fvCategoryPill" style="display:none;">Magazine</span>
+        </div>
+      </div>
+
+      <!-- Center Zoom Controls -->
+      <div class="fv-header__center">
+        <div class="fv-zoom-group">
+          <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvZoomOutBtn" title="Zoom Out" aria-label="Zoom Out">
+            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </button>
+          <button class="fv-zoom-label" id="fvZoomLevel" title="Reset Zoom" aria-label="Reset Zoom">100%</button>
+          <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvZoomInBtn" title="Zoom In" aria-label="Zoom In">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Utility Controls -->
+      <div class="fv-header__right">
+        <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvSearchBtn" title="Search in Document" aria-label="Search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </button>
+
+        <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvThumbnailsBtn" title="Page Thumbnails" aria-label="Thumbnails">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        </button>
+
+        <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvInfoBtn" title="Publication Details" aria-label="Details">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        </button>
+
+        <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvShareBtn" title="Share Publication" aria-label="Share">
+          <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+        </button>
+
+        <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvQrBtn" title="View Mobile QR Code" aria-label="QR Code">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><line x1="14" y1="14" x2="14.01" y2="14"></line><line x1="20" y1="14" x2="20.01" y2="14"></line><line x1="14" y1="20" x2="20" y2="20"></line></svg>
+        </button>
+
+        <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvDownloadBtn" title="Download Original PDF" aria-label="Download PDF" style="display:none;">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        </button>
+
+        <button class="fv-tool-btn fv-tool-btn--icon-only" id="fvFullscreenBtn" title="Toggle Fullscreen (F)" aria-label="Fullscreen">
+          <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Flipbook Arena Stage -->
+    <main class="fv-stage" id="fvStage">
+      <!-- Side Prev Navigation Arrow -->
+      <button class="fv-side-arrow fv-side-arrow--prev" id="fvPrevArrow" title="Previous Page (←)" aria-label="Previous Page">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+
+      <!-- Centered Viewport & Book Container -->
+      <div class="fv-viewport" id="fvViewport">
+        <div class="fv-book-container" id="fvBookContainer">
+          <!-- Flipbook rendered dynamically by StPageFlip & PDF.js -->
+        </div>
+      </div>
+
+      <!-- Side Next Navigation Arrow -->
+      <button class="fv-side-arrow fv-side-arrow--next" id="fvNextArrow" title="Next Page (→)" aria-label="Next Page">
+        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+
+      <!-- Floating Bottom Dock Controls -->
+      <div class="fv-dock-wrap">
+        <nav class="fv-dock" aria-label="Reader Navigation">
+          <button class="fv-dock-btn" id="fvFirstBtn" title="First Page (Home)" aria-label="First Page">
+            <svg viewBox="0 0 24 24"><polygon points="11 19 2 12 11 5 11 19"></polygon><polygon points="22 19 13 12 22 5 22 19"></polygon></svg>
+          </button>
+          <button class="fv-dock-btn" id="fvPrevBtn" title="Previous Page (←)" aria-label="Previous Page">
+            <svg viewBox="0 0 24 24"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
+          </button>
+
+          <span class="fv-page-badge">
+            <span id="fvCurrentPage">1</span> / <span id="fvTotalPages">-</span>
+          </span>
+
+          <div class="fv-scrubber-wrap">
+            <input type="range" min="1" max="1" value="1" class="fv-scrubber" id="fvScrubber" aria-label="Page Scrubber" />
+            <div class="fv-scrubber-tooltip" id="fvScrubberTooltip">Page 1</div>
+          </div>
+
+          <button class="fv-dock-btn" id="fvNextBtn" title="Next Page (→)" aria-label="Next Page">
+            <svg viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+          </button>
+          <button class="fv-dock-btn" id="fvLastBtn" title="Last Page (End)" aria-label="Last Page">
+            <svg viewBox="0 0 24 24"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
+          </button>
+
+          <button class="fv-autoplay-btn" id="fvAutoplayBtn" title="Autoplay Slideshow (Space)" aria-label="Autoplay">
+            <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span>Auto</span>
+          </button>
+        </nav>
+      </div>
+    </main>
+
+    <!-- Slide-Up Thumbnails Filmstrip Tray -->
+    <div class="fv-thumbnails-tray" id="fvThumbnailsTray">
+      <div class="fv-tray-header">
+        <span>PAGE PREVIEWS</span>
+        <button id="fvCloseTrayBtn" style="color:var(--fv-text-muted); cursor:pointer;">✕ Close</button>
+      </div>
+      <div class="fv-thumb-scroll" id="fvThumbScroll"></div>
+    </div>
+
+    <!-- Slide-In Info Drawer -->
+    <aside class="fv-drawer" id="fvInfoDrawer" aria-label="Publication Details">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+        <h3 style="font-size:1.15rem; font-weight:800;">Publication Info</h3>
+        <button id="fvCloseDrawerBtn" style="font-size:1.2rem; color:var(--fv-text-muted); cursor:pointer;">✕</button>
+      </div>
+      <span class="fv-category-pill" id="fvInfoCategory" style="display:inline-block; margin-bottom:12px;">Magazine</span>
+      <h2 id="fvInfoTitle" style="font-size:1.35rem; font-weight:800; margin-bottom:8px; line-height:1.3;">-</h2>
+      <p id="fvInfoAuthor" style="font-size:0.88rem; color:var(--fv-primary); font-weight:600; margin-bottom:14px;"></p>
+      <p id="fvInfoPages" style="font-size:0.82rem; color:var(--fv-text-muted); margin-bottom:18px;"></p>
+      <div id="fvInfoDesc" style="font-size:0.92rem; color:var(--fv-text-muted); line-height:1.65; white-space:pre-wrap;"></div>
+    </aside>
+
+    <!-- Loading State Overlay -->
+    <div class="fv-overlay" id="fvLoader">
+      <div class="fv-spinner"></div>
+      <h2 style="font-size:1.3rem; font-weight:800; margin-bottom:6px;" id="fvLoaderTitle">Loading Flipbook...</h2>
+      <p style="font-size:0.9rem; color:var(--fv-text-muted); max-width:400px;" id="fvLoaderDesc">Rendering high-resolution vector canvas pages.</p>
+      <div class="fv-progress-bar">
+        <div class="fv-progress-fill" id="fvLoaderFill"></div>
+      </div>
+    </div>
+
+    <!-- Error State Overlay -->
+    <div class="fv-overlay" id="fvErrorOverlay" style="display:none;">
+      <div class="fv-card-icon" id="fvErrorIcon">⚠️</div>
+      <h2 style="font-size:1.35rem; font-weight:800; margin-bottom:8px;" id="fvErrorTitle">Flipbook Notice</h2>
+      <p style="font-size:0.92rem; color:var(--fv-text-muted); max-width:420px; line-height:1.6; margin-bottom:20px;" id="fvErrorDesc">
+        Unable to load the publication.
+      </p>
+      <button class="fv-btn-primary" id="fvErrorActionBtn" style="max-width:200px;" onclick="window.location.reload();">Retry</button>
+    </div>
+
+    <!-- Password Protection Modal Overlay -->
+    <div class="fv-overlay" id="fvPasswordOverlay" style="display:none;">
+      <div class="fv-card-modal">
+        <div class="fv-card-icon">🔒</div>
+        <h2 class="fv-card-title">Protected Flipbook</h2>
+        <p class="fv-card-desc">This publication is password protected. Enter the access password to open the reader.</p>
+        <div class="fv-input-group">
+          <input type="password" class="fv-input" id="fvPasswordInput" placeholder="Enter password..." autocomplete="current-password" />
+        </div>
+        <p id="fvPasswordError" style="display:none; color:var(--fv-danger); font-size:0.86rem; font-weight:600; margin-bottom:14px;"></p>
+        <button class="fv-btn-primary" id="fvPasswordBtn">Unlock & Read Flipbook</button>
+      </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div class="fv-modal-overlay" id="fvShareModal">
+      <div class="fv-modal">
+        <div class="fv-modal__header">
+          <h3 class="fv-modal__title">Share Publication</h3>
+          <button class="fv-modal-close" style="font-size:1.2rem; cursor:pointer;">✕</button>
+        </div>
+        <p style="font-size:0.9rem; color:var(--fv-text-muted); margin-bottom:14px;">Copy the direct public reader URL to share with anyone:</p>
+        <div style="display:flex; gap:8px; margin-bottom:18px;">
+          <input type="text" class="fv-input" id="fvShareUrlInput" readonly />
+          <button class="fv-btn-primary" id="fvCopyShareBtn" style="width:110px;">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div class="fv-modal-overlay" id="fvQrModal">
+      <div class="fv-modal" style="text-align:center;">
+        <div class="fv-modal__header">
+          <h3 class="fv-modal__title">Mobile QR Reader</h3>
+          <button class="fv-modal-close" style="font-size:1.2rem; cursor:pointer;">✕</button>
+        </div>
+        <p style="font-size:0.88rem; color:var(--fv-text-muted); margin-bottom:18px;">Scan with any mobile smartphone camera to open and read instantly:</p>
+        <div style="display:inline-block; padding:16px; background:#ffffff; border-radius:12px; margin-bottom:18px;">
+          <canvas id="fvQrCanvas"></canvas>
+        </div>
+        <div>
+          <button class="fv-btn-primary fv-modal-close" style="max-width:180px; margin:0 auto;">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search Modal -->
+    <div class="fv-modal-overlay" id="fvSearchModal">
+      <div class="fv-modal">
+        <div class="fv-modal__header">
+          <h3 class="fv-modal__title">Search in Document</h3>
+          <button class="fv-modal-close" style="font-size:1.2rem; cursor:pointer;">✕</button>
+        </div>
+        <div style="margin-bottom:14px;">
+          <input type="text" class="fv-input" id="fvSearchInput" placeholder="Type keyword and press Enter..." />
+        </div>
+        <div id="fvSearchResults" style="max-height:240px; overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- Global Toast Notification -->
+    <div class="fv-toast" id="fvToast">Notice</div>
+
+  </div>
+
+  <!-- Viewer Script Engine -->
+  <script src="/viewer/viewer.js"></script>
+</body>
+</html>

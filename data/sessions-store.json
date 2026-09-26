@@ -1,0 +1,412 @@
+[
+  {
+    "id": "ses_muilzhqd96ap6",
+    "user_id": "usr_muilzhnnkpm7t",
+    "token_hash": "9df453e5e21ea3348c54c512f881d1fb08dcd6dadfa030266ae27475214f2c78",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T16:33:19.237Z",
+    "created_at": "2026-09-26T16:33:19.237Z"
+  },
+  {
+    "id": "ses_muilzhnt439cf",
+    "user_id": "usr_muilzhnnkpm7t",
+    "token_hash": "f9ffe8f9347d847cda3439de60b320873efcf27d390b8ec803df1b3954eac104",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T16:33:19.145Z",
+    "created_at": "2026-09-26T16:33:19.145Z"
+  },
+  {
+    "id": "ses_muilma14eixxi",
+    "user_id": "usr_muilma10fkocy",
+    "token_hash": "1f24f70883f9787d37f98387f7f53965aabd865ec4f939d0c6010a95bd5d4a13",
+    "client_type": "WINUI",
+    "ip_address": "127.0.0.1",
+    "user_agent": "node",
+    "expires_at": "2026-10-26T16:23:02.728Z",
+    "created_at": "2026-09-26T16:23:02.728Z"
+  },
+  {
+    "id": "ses_muilm0b5juyjh",
+    "user_id": "usr_muilm08ik8gpb",
+    "token_hash": "1459da3743bf61d7194555329d0caefd7fa733e7f561da4b7196c7522abbf4bf",
+    "client_type": "WINUI",
+    "ip_address": "127.0.0.1",
+    "user_agent": "node",
+    "expires_at": "2026-10-26T16:22:50.129Z",
+    "created_at": "2026-09-26T16:22:50.129Z"
+  },
+  {
+    "id": "ses_muilm08o3b3v5",
+    "user_id": "usr_muilm08ik8gpb",
+    "token_hash": "3d1854cb72aa3ca834cf4726cf64c482e3d37d2ac450e87396d502e5986aee6a",
+    "client_type": "WINUI",
+    "ip_address": "127.0.0.1",
+    "user_agent": "node",
+    "expires_at": "2026-10-26T16:22:50.040Z",
+    "created_at": "2026-09-26T16:22:50.040Z"
+  },
+  {
+    "id": "ses_muillrrfojwc4",
+    "user_id": "usr_muillrolg84l6",
+    "token_hash": "699a321718c52352c73f31c5838f2bac44960490bdf59c6fcb75ca5b5c59a0eb",
+    "client_type": "WINUI",
+    "ip_address": "127.0.0.1",
+    "user_agent": "node",
+    "expires_at": "2026-10-26T16:22:39.050Z",
+    "created_at": "2026-09-26T16:22:39.051Z"
+  },
+  {
+    "id": "ses_muillrosmtmmm",
+    "user_id": "usr_muillrolg84l6",
+    "token_hash": "4b44e28f8ae06fb2941b3cb68c70001c7453227d985cf93e7e1b75710ae7e510",
+    "client_type": "WINUI",
+    "ip_address": "127.0.0.1",
+    "user_agent": "node",
+    "expires_at": "2026-10-26T16:22:38.956Z",
+    "created_at": "2026-09-26T16:22:38.956Z"
+  },
+  {
+    "id": "ses_muilksnyn8rcr",
+    "user_id": "usr_muilksntn27s1",
+    "token_hash": "83b91114d50f8d0a4864191f396aa6774a24c532e8aff16b9f978d4cefd7dcbb",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T16:21:53.566Z",
+    "created_at": "2026-09-26T16:21:53.566Z"
+  },
+  {
+    "id": "ses_muilkslc9oqmz",
+    "user_id": "usr_muilksl6e1zq0",
+    "token_hash": "3be3cfb10dc88e3cff9dd51cf9c86ab9db83107faf4c5c3da533235a3ca8ad24",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T16:21:53.472Z",
+    "created_at": "2026-09-26T16:21:53.472Z"
+  },
+  {
+    "id": "ses_muilkj7buxuno",
+    "user_id": "usr_muilkj75djioj",
+    "token_hash": "61d882a8f74782e6f7b269a78ce0e4a2b86f1c79879fce436b1c179fbf9e50c0",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T16:21:41.303Z",
+    "created_at": "2026-09-26T16:21:41.303Z"
+  },
+  {
+    "id": "ses_muilkj1ezto0y",
+    "user_id": "usr_muilkiy8fg674",
+    "token_hash": "56fac8421e94641fc171ae63fe406fbeb51775d45a64485795c5176cb2993248",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T16:21:41.090Z",
+    "created_at": "2026-09-26T16:21:41.090Z"
+  },
+  {
+    "id": "ses_muijh200a5s3g",
+    "user_id": "usr_muijh1zv48pgc",
+    "token_hash": "713306ca4bba8336707f3bb88facfc85a1e7416eb41a676eba3e301099600d7c",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:22:59.808Z",
+    "created_at": "2026-09-26T15:22:59.808Z"
+  },
+  {
+    "id": "ses_muijh1tm2mknv",
+    "user_id": "usr_muijh1qz6bs5m",
+    "token_hash": "a3b45fad18ded1cd632445917c3301c8fce173a642d1a61600be4402ac68d0d4",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:22:59.578Z",
+    "created_at": "2026-09-26T15:22:59.578Z"
+  },
+  {
+    "id": "ses_muijgr94b7319",
+    "user_id": "usr_muijgr8zu55ww",
+    "token_hash": "e692153fe86d26952b3e7614b0afecc8aebe5a6c376ad0079d49c2001a3d0ca9",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:22:45.880Z",
+    "created_at": "2026-09-26T15:22:45.880Z"
+  },
+  {
+    "id": "ses_muijgr67uv9wc",
+    "user_id": "usr_muijgr5yfpzrs",
+    "token_hash": "87b1c738c6a4195e2dfe4f361a529c77a3ea02e0119b28600d57041d62b607f0",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:22:45.774Z",
+    "created_at": "2026-09-26T15:22:45.775Z"
+  },
+  {
+    "id": "ses_muijdnsbbqb7i",
+    "user_id": "usr_muijdns6wyy9o",
+    "token_hash": "34b735125d94bfac26681fe6106dea381d793808dcd9abc4f1b0a6864385719d",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:20:21.419Z",
+    "created_at": "2026-09-26T15:20:21.419Z"
+  },
+  {
+    "id": "ses_muijdnmx7mjae",
+    "user_id": "usr_muijdnk8snb93",
+    "token_hash": "4286c07c35332fa645b8b943c2be56b55be5cc0ffb0fda0401e4a551b9752436",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:20:21.225Z",
+    "created_at": "2026-09-26T15:20:21.225Z"
+  },
+  {
+    "id": "ses_muijd2cl44q0a",
+    "user_id": "usr_muijd2cepak75",
+    "token_hash": "ca29509ef99d5b7836b672a20d853e751e4a976f61f495cd3ea245f9d3104e8a",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:19:53.637Z",
+    "created_at": "2026-09-26T15:19:53.637Z"
+  },
+  {
+    "id": "ses_muijd24qqgufm",
+    "user_id": "usr_muijd217v2sbo",
+    "token_hash": "8c3b1204ac895650fadfdf8db2ed9e6dda3e4145dc172facc4b4f4faa6b3917c",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:19:53.354Z",
+    "created_at": "2026-09-26T15:19:53.354Z"
+  },
+  {
+    "id": "ses_muijco3rf1gdj",
+    "user_id": "usr_muijco3n51ty6",
+    "token_hash": "2ee7c3cc7baed3f9369adce4a31e69a7d9a083b5e340b401d3630873c3c2af4a",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:19:35.175Z",
+    "created_at": "2026-09-26T15:19:35.175Z"
+  },
+  {
+    "id": "ses_muijco0x2g204",
+    "user_id": "usr_muijco0nu3bt6",
+    "token_hash": "488a947205913e2244f1e3c3f2856106f8c9c3302148cb8affe67e0649d7baa5",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:19:35.073Z",
+    "created_at": "2026-09-26T15:19:35.073Z"
+  },
+  {
+    "id": "ses_muiiovgemruxp",
+    "user_id": "usr_muiiovgb7q1qw",
+    "token_hash": "a2411f52855a4810d89a5f7cb4c76ff4e249ff3a1caae8327b9c47aa77ec7feb",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:01:04.958Z",
+    "created_at": "2026-09-26T15:01:04.958Z"
+  },
+  {
+    "id": "ses_muiiovb3afty3",
+    "user_id": "usr_muiiov886s6jy",
+    "token_hash": "32d1cd6b385817cb3797b20b696b120c44435558d8a63c28ddf9b1b1c51664f2",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:01:04.767Z",
+    "created_at": "2026-09-26T15:01:04.767Z"
+  },
+  {
+    "id": "ses_muiion9duzz7t",
+    "user_id": "usr_muiion9abalhb",
+    "token_hash": "9ecb3067068c60263149f8607cc84c0219ed870a30be0d388f72a7c9ca08d93c",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:00:54.337Z",
+    "created_at": "2026-09-26T15:00:54.337Z"
+  },
+  {
+    "id": "ses_muiion6wb2p1w",
+    "user_id": "usr_muiion6qx0yx4",
+    "token_hash": "cbbb0d0bd9a7ab423a1ff82064f67ba56e97fa092ba6cdc236bbb9bc919e5e10",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:00:54.248Z",
+    "created_at": "2026-09-26T15:00:54.248Z"
+  },
+  {
+    "id": "ses_muiink23ef8im",
+    "user_id": "usr_muiink1zw5tai",
+    "token_hash": "36f1a7e7d91c56615e7db52f0ee9c84073f384934d1711162668b3f9bd79a5c4",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:00:03.531Z",
+    "created_at": "2026-09-26T15:00:03.531Z"
+  },
+  {
+    "id": "ses_muiinjzdq2e3y",
+    "user_id": "usr_muiinjz6srm0c",
+    "token_hash": "5673b4ead65523b48c95636213db7a7a1bdfb78350d63b69680daef02b819dd9",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T15:00:03.433Z",
+    "created_at": "2026-09-26T15:00:03.433Z"
+  },
+  {
+    "id": "ses_muiincft3fxq0",
+    "user_id": "usr_muiincfq4sk0d",
+    "token_hash": "530891cf61011a5d64f6467b69b90dbc5a098d398ec96787eba8d3568ac7ad08",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:59:53.657Z",
+    "created_at": "2026-09-26T14:59:53.657Z"
+  },
+  {
+    "id": "ses_muiinc9fwt7sa",
+    "user_id": "usr_muiinc5pba5zl",
+    "token_hash": "646cc2a3f3076d95d97cc1aa2bb5082d1fd3df1d08a6025a1e8fb7224aff0b2e",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:59:53.427Z",
+    "created_at": "2026-09-26T14:59:53.427Z"
+  },
+  {
+    "id": "ses_muiilj76nfzwe",
+    "user_id": "usr_muiilj720esrt",
+    "token_hash": "8b8346532283a8ec1c09f011bbc7f04b2c1c55188b8b19ee4ae5c8002850dc23",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:58:29.106Z",
+    "created_at": "2026-09-26T14:58:29.106Z"
+  },
+  {
+    "id": "ses_muiilj1isbk4g",
+    "user_id": "usr_muiiliyombwu3",
+    "token_hash": "d57b5ed82647fa21141a7b1b4f0b83d982e146eb870ae1cee9474fae32ef2c8e",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:58:28.902Z",
+    "created_at": "2026-09-26T14:58:28.902Z"
+  },
+  {
+    "id": "ses_muiilajztkywu",
+    "user_id": "usr_muiilajwpcv63",
+    "token_hash": "dff4f96a658cb73f5e57b520ff0417106cd417ebaaed1e1d8642cd3f76ff5abc",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:58:17.903Z",
+    "created_at": "2026-09-26T14:58:17.903Z"
+  },
+  {
+    "id": "ses_muiilahdsam7t",
+    "user_id": "usr_muiilah8skz5u",
+    "token_hash": "5e01a54f13f835f41416a9020381484ea3ebf31c9a19e7a0cb000396fcf6cbc0",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:58:17.809Z",
+    "created_at": "2026-09-26T14:58:17.809Z"
+  },
+  {
+    "id": "ses_muiik4v83buf9",
+    "user_id": "usr_muiik4v3gyqea",
+    "token_hash": "c34ec2c45f59c331a368d64bf18d4745b6e65e034b100d02f9e9135c8b12bceb",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:57:23.876Z",
+    "created_at": "2026-09-26T14:57:23.876Z"
+  },
+  {
+    "id": "ses_muiik4pbp8n6v",
+    "user_id": "usr_muiik4mkn4e7d",
+    "token_hash": "87b95cc62c4a7df4191d402cb6a15f8d8983bb258fabbae1a9f578086fa001cd",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:57:23.663Z",
+    "created_at": "2026-09-26T14:57:23.663Z"
+  },
+  {
+    "id": "ses_muiijbb644tvn",
+    "user_id": "usr_muiijbb17t62a",
+    "token_hash": "9ce71ff403830b7c26685df1823f165c52f42c3cdb065355fa69fc0f04083238",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:56:45.569Z",
+    "created_at": "2026-09-26T14:56:45.570Z"
+  },
+  {
+    "id": "ses_muiijb87dexk4",
+    "user_id": "usr_muiijb813znjq",
+    "token_hash": "29b7335bf060ca324fcbb8a2018494360eb38ee3f13014b51bbadddb6eddaef3",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:56:45.463Z",
+    "created_at": "2026-09-26T14:56:45.463Z"
+  },
+  {
+    "id": "ses_muii7aq5e4of5",
+    "user_id": "usr_muii7aq3r5ual",
+    "token_hash": "59775a079fc783abb9e987a0a76b2b64de224bed7a03dc1924533144d3ba34de",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:47:24.941Z",
+    "created_at": "2026-09-26T14:47:24.941Z"
+  },
+  {
+    "id": "ses_muii7aju6kdaq",
+    "user_id": "usr_muii7aha0ywr6",
+    "token_hash": "a33a7165ad87eb004b9ba4840e2af359f5e7880aeb8ea0b3400d4c273327a308",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:47:24.714Z",
+    "created_at": "2026-09-26T14:47:24.714Z"
+  },
+  {
+    "id": "ses_muii6pwqdv9d7",
+    "user_id": "usr_muii6pwmgd7c3",
+    "token_hash": "55f7586abe6cd303f1e7f8e3a7efbc226a2fddad50990e5a1aa7a5b2022313b8",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:46:57.962Z",
+    "created_at": "2026-09-26T14:46:57.962Z"
+  },
+  {
+    "id": "ses_muii6ppphpwhw",
+    "user_id": "usr_muii6plpl52cm",
+    "token_hash": "2058cba97ac31be6345e0201956b547fe192ba9eb7754c3088ab16f767214cb9",
+    "client_type": "WEB",
+    "ip_address": "127.0.0.1",
+    "user_agent": "",
+    "expires_at": "2026-10-26T14:46:57.709Z",
+    "created_at": "2026-09-26T14:46:57.709Z"
+  }
+]
