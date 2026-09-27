@@ -456,24 +456,39 @@
       el.brandBadge.style.display = publicationData.hasBranding ? 'flex' : 'none';
     }
 
-    if (publicationData.downloadEnabled !== false) {
-      if (el.downloadBtn) {
-        el.downloadBtn.style.display = 'inline-flex';
-        el.downloadBtn.onclick = () => {
-          sendAnalytics('DOWNLOAD');
-          const tokenParam = viewerToken ? `&token=${encodeURIComponent(viewerToken)}` : '';
-          window.open(`/api/public/${publicationId}/pdf?download=1${tokenParam}`, '_blank');
-        };
+    const isDownloadAllowed = publicationData.downloadEnabled !== false && 
+                              publicationData.download_enabled !== 0 && 
+                              publicationData.download_enabled !== false;
+
+    function handleDownload(e) {
+      if (e) e.stopPropagation();
+      sendAnalytics('DOWNLOAD');
+      closeAllModals();
+      const tokenParam = viewerToken ? `&token=${encodeURIComponent(viewerToken)}` : '';
+      const downloadUrl = `/api/public/${publicationId}/pdf?download=1${tokenParam}`;
+      
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${publicationData?.title || 'publication'}.pdf`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => link.remove(), 500);
+      showToast('Downloading PDF...');
+    }
+
+    if (el.downloadBtn) {
+      el.downloadBtn.style.display = isDownloadAllowed ? 'inline-flex' : 'none';
+      if (isDownloadAllowed) {
+        el.downloadBtn.onclick = handleDownload;
       }
-      const mobileDownloadBtn = document.getElementById('fvMobileDownloadBtn');
-      if (mobileDownloadBtn) {
-        mobileDownloadBtn.style.display = 'flex';
-        mobileDownloadBtn.onclick = () => {
-          sendAnalytics('DOWNLOAD');
-          closeAllModals();
-          const tokenParam = viewerToken ? `&token=${encodeURIComponent(viewerToken)}` : '';
-          window.open(`/api/public/${publicationId}/pdf?download=1${tokenParam}`, '_blank');
-        };
+    }
+
+    const mobileDownloadBtn = document.getElementById('fvMobileDownloadBtn');
+    if (mobileDownloadBtn) {
+      mobileDownloadBtn.style.display = isDownloadAllowed ? 'flex' : 'none';
+      if (isDownloadAllowed) {
+        mobileDownloadBtn.onclick = handleDownload;
       }
     }
 
@@ -954,6 +969,14 @@
     if (el.thumbnailsTray) el.thumbnailsTray.classList.remove('open');
     if (el.thumbnailsBtn) el.thumbnailsBtn.classList.remove('active');
     if (el.infoBtn) el.infoBtn.classList.remove('active');
+
+    // Force GPU canvas re-composite and transform refresh to prevent mobile blanking
+    requestAnimationFrame(() => {
+      updateContainerTransform();
+      if (currentActivePageFlip && typeof currentActivePageFlip.update === 'function') {
+        try { currentActivePageFlip.update(); } catch (e) {}
+      }
+    });
   }
 
   // --- Setup Mouse Wheel & Touch Interaction ---
@@ -1321,6 +1344,15 @@
     // Modal Close Buttons
     document.querySelectorAll('.fv-modal-close').forEach(btn => {
       btn.onclick = closeAllModals;
+    });
+
+    // Backdrop Click Outside to Close Modals
+    document.querySelectorAll('.fv-modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          closeAllModals();
+        }
+      });
     });
 
     // Password Prompt Submit
