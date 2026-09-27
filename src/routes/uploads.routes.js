@@ -120,7 +120,20 @@ router.post('/chunk', requireAuth, upload.single('chunk'), async (req, res) => {
 // -------------------------------------------------------------
 router.post('/complete', requireAuth, uploadInitLimiter, async (req, res) => {
   try {
-    const { uploadId, title, category, description, author, coverBase64, visibility, password } = req.body;
+    const {
+      uploadId,
+      title,
+      category,
+      description,
+      author,
+      coverBase64,
+      visibility,
+      password,
+      download_enabled,
+      downloadEnabled,
+      share_enabled,
+      shareEnabled
+    } = req.body;
 
     const result = await uploadService.completeUpload({
       userId: req.user.id,
@@ -131,7 +144,9 @@ router.post('/complete', requireAuth, uploadInitLimiter, async (req, res) => {
       author,
       coverBase64,
       visibility,
-      password
+      password,
+      downloadEnabled: downloadEnabled !== undefined ? downloadEnabled : download_enabled,
+      shareEnabled: shareEnabled !== undefined ? shareEnabled : share_enabled
     });
 
     return res.status(200).json({

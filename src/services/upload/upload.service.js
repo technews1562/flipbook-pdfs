@@ -366,7 +366,9 @@ class UploadService {
     author,
     coverBase64,
     visibility,
-    password
+    password,
+    downloadEnabled,
+    shareEnabled
   }) {
     if (!uploadId) {
       const err = new Error('Missing uploadId parameter.');
@@ -584,6 +586,8 @@ class UploadService {
       published: 1,
       visibility: pubVisibility,
       password_hash: passwordHash,
+      download_enabled: downloadEnabled !== undefined ? (downloadEnabled ? 1 : 0) : 1,
+      share_enabled: shareEnabled !== undefined ? (shareEnabled ? 1 : 0) : 1,
       has_branding: plan.has_branding ? 1 : 0
     });
 
