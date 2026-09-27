@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { requireAdmin } = require('../middleware/auth');
 const authService = require('../services/auth/auth.service');
 const migrationService = require('../services/migration/migration.service');
+const backupService = require('../services/backup/backup.service');
 const db = require('../db/database');
 
 // -------------------------------------------------------------
@@ -386,6 +387,141 @@ router.post('/migrate-github', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: { code: 'MIGRATION_FAILED', message: err.message }
+    });
+  }
+});
+
+// -------------------------------------------------------------
+// GET /api/admin/db/summary (Live Database Statistics)
+// -------------------------------------------------------------
+router.get('/db/summary', (req, res) => {
+  try {
+    const stats = db.getPlatformStats();
+    const backups = backupService.listLocalBackups();
+    return res.status(200).json({
+      success: true,
+      data: {
+        stats,
+        total_backups: backups.length,
+        latest_backup: backups[0] || null
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'STATS_ERROR', message: err.message }
+    });
+  }
+});
+
+// -------------------------------------------------------------
+// GET /api/admin/db/export (Download Live Database JSON Snapshot)
+// -------------------------------------------------------------
+router.get('/db/export', (req, res) => {
+  try {
+    const rawData = db.getRawStores();
+    const payload = {
+      version: '1.0.0',
+      exported_at: new Date().toISOString(),
+      counts: {
+        users: (rawData.users || []).length,
+        publications: (rawData.publications || []).length,
+        plans: (rawData.plans || []).length,
+        analytics: (rawData.analytics || []).length
+      },
+      data: rawData
+    };
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="flipview-database-export-${dateStr}.json"`);
+    return res.send(JSON.stringify(payload, null, 2));
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'EXPORT_FAILED', message: err.message }
+    });
+  }
+});
+
+// -------------------------------------------------------------
+// GET /api/admin/db/backups (List Daily Database Backups)
+// -------------------------------------------------------------
+router.get('/db/backups', (req, res) => {
+  try {
+    const backups = backupService.listLocalBackups();
+    return res.status(200).json({
+      success: true,
+      data: backups
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'BACKUP_LIST_FAILED', message: err.message }
+    });
+  }
+});
+
+// -------------------------------------------------------------
+// POST /api/admin/db/backup-now (Trigger On-Demand Backup & R2 Mirror)
+// -------------------------------------------------------------
+router.post('/db/backup-now', async (req, res) => {
+  try {
+    const result = await backupService.createBackup('MANUAL_ADMIN');
+    return res.status(200).json({
+      success: true,
+      message: 'Database backup successfully created and mirrored to Cloudflare R2.',
+      data: result
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'BACKUP_FAILED', message: err.message }
+    });
+  }
+});
+
+// -------------------------------------------------------------
+// GET /api/admin/db/backups/:filename (Download Backup File)
+// -------------------------------------------------------------
+router.get('/db/backups/:filename', (req, res) => {
+  try {
+    const { filename } = req.params;
+    const backup = backupService.getBackupContent(filename);
+    if (!backup) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Backup file not found.' }
+      });
+    }
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(backup.content);
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'DOWNLOAD_FAILED', message: err.message }
+    });
+  }
+});
+
+// -------------------------------------------------------------
+// POST /api/admin/db/restore (Restore from Payload)
+// -------------------------------------------------------------
+router.post('/db/restore', (req, res) => {
+  try {
+    const backupData = req.body;
+    const result = backupService.restoreFromData(backupData);
+    return res.status(200).json({
+      success: true,
+      message: 'Database successfully restored from backup snapshot.',
+      data: result
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'RESTORE_FAILED', message: err.message }
     });
   }
 });

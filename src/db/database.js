@@ -1482,5 +1482,52 @@ module.exports = {
       planBreakdown,
       categoryBreakdown
     };
+  },
+
+  getRawStores() {
+    return {
+      users: Array.isArray(usersStore) ? usersStore : [],
+      publications: Array.isArray(memoryStore) ? memoryStore : [],
+      plans: Array.isArray(plansStore) ? plansStore : DEFAULT_PLANS,
+      sessions: Array.isArray(sessionsStore) ? sessionsStore : [],
+      upload_sessions: Array.isArray(uploadSessionsStore) ? uploadSessionsStore : [],
+      analytics: Array.isArray(analyticsEventsStore) ? analyticsEventsStore : [],
+      password_resets: Array.isArray(passwordResetsStore) ? passwordResetsStore : []
+    };
+  },
+
+  restoreRawStores(data = {}) {
+    if (data.users && Array.isArray(data.users)) {
+      usersStore = data.users;
+      try {
+        fs.writeFileSync(jsonUsersPath, JSON.stringify(usersStore, null, 2), 'utf8');
+      } catch (e) {}
+    }
+    if (data.publications && Array.isArray(data.publications)) {
+      memoryStore = data.publications;
+      try {
+        fs.writeFileSync(jsonDbPath, JSON.stringify(memoryStore, null, 2), 'utf8');
+      } catch (e) {}
+    }
+    if (data.plans && Array.isArray(data.plans)) {
+      plansStore = data.plans;
+      try {
+        fs.writeFileSync(jsonPlansPath, JSON.stringify(plansStore, null, 2), 'utf8');
+      } catch (e) {}
+    }
+    if (data.analytics && Array.isArray(data.analytics)) {
+      analyticsEventsStore = data.analytics;
+      try {
+        fs.writeFileSync(jsonAnalyticsEventsPath, JSON.stringify(analyticsEventsStore, null, 2), 'utf8');
+      } catch (e) {}
+    }
+    return {
+      success: true,
+      restored_counts: {
+        users: usersStore.length,
+        publications: memoryStore.length,
+        plans: plansStore.length
+      }
+    };
   }
 };

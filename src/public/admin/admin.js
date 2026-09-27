@@ -216,6 +216,7 @@
       publications: 'Publications Library',
       upload: 'Publish Digital PDF',
       migration: 'GitHub to Cloudflare R2 Migration',
+      database: 'Database & Automated Backups',
       settings: 'System & API Settings'
     };
     const titleEl = document.getElementById('pageTitle');
@@ -224,7 +225,146 @@
     if (tabId === 'users') loadUsers();
     if (tabId === 'publications') loadPublications();
     if (tabId === 'overview') loadStats();
+    if (tabId === 'database') loadDatabaseBackups();
   };
+
+  // --- Database & Backups Management ---
+  async function loadDatabaseBackups() {
+    try {
+      // 1. Load summary
+      const sumRes = await apiFetch('/api/admin/db/summary');
+      if (sumRes.ok) {
+        const sumJson = await sumRes.json();
+        if (sumJson.success && sumJson.data) {
+          const stats = sumJson.data.stats || {};
+          const usersEl = document.getElementById('dbStatUsers');
+          const pubsEl = document.getElementById('dbStatPubs');
+          const anEl = document.getElementById('dbStatAnalytics');
+          const countBadge = document.getElementById('dbBackupCountBadge');
+
+          if (usersEl) usersEl.textContent = stats.totalUsers || 0;
+          if (pubsEl) pubsEl.textContent = stats.totalPublications || 0;
+          if (anEl) anEl.textContent = Number(stats.totalViews || 0).toLocaleString();
+          if (countBadge) countBadge.textContent = `${sumJson.data.total_backups || 0} Backups Available`;
+        }
+      }
+
+      // 2. Load backups list
+      const tbody = document.getElementById('backupsTableBody');
+      if (!tbody) return;
+
+      const res = await apiFetch('/api/admin/db/backups');
+      if (!res.ok) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load backups.</td></tr>';
+        return;
+      }
+
+      const json = await res.json();
+      const backups = json.data || [];
+
+      if (backups.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No daily backups found. Click "Backup Database Now" to generate one.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = backups.map(b => {
+        const formattedDate = new Date(b.created_at).toLocaleString();
+        const counts = b.counts ? `${b.counts.users || 0} users • ${b.counts.publications || 0} pubs` : '—';
+        const triggerBadge = b.filename.includes('latest') ? '<span class="badge badge-primary">Latest</span>' : '<span class="badge badge-success">Daily</span>';
+
+        return `
+          <tr>
+            <td><code>${escapeHtml(b.filename)}</code></td>
+            <td>${formattedDate}</td>
+            <td>${triggerBadge}</td>
+            <td><strong>${b.size_kb || 0} KB</strong></td>
+            <td>${counts}</td>
+            <td><span class="badge badge-success">☁️ R2 Synced</span></td>
+            <td>
+              <button class="btn btn-secondary btn-sm" onclick="downloadBackup('${escapeHtml(b.filename)}')">
+                📥 Download
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } catch (err) {
+      console.error('[Load Backups Error]', err);
+    }
+  }
+
+  window.downloadBackup = async function (filename) {
+    try {
+      const token = getAdminToken();
+      const res = await apiFetch(`/api/admin/db/backups/${encodeURIComponent(filename)}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        showToast(`Downloaded ${filename}`);
+      } else {
+        alert('Failed to download backup file.');
+      }
+    } catch (e) {
+      alert(`Download error: ${e.message}`);
+    }
+  };
+
+  async function handleBackupNow() {
+    const btn = document.getElementById('backupNowBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳ Backing up...</span>';
+    }
+
+    try {
+      const res = await apiFetch('/api/admin/db/backup-now', { method: 'POST' });
+      const json = await res.json();
+      if (json.success) {
+        showToast('✅ Database backup created & mirrored to Cloudflare R2!');
+        loadDatabaseBackups();
+      } else {
+        alert(json.error?.message || 'Backup failed.');
+      }
+    } catch (err) {
+      alert(`Error triggering backup: ${err.message}`);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚡ Backup Database Now</span>';
+      }
+    }
+  }
+
+  async function handleExportDb() {
+    try {
+      showToast('Preparing live database export...');
+      const res = await apiFetch('/api/admin/db/export');
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateStr = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `flipview-database-export-${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        showToast('✅ Database JSON downloaded successfully!');
+      } else {
+        alert('Failed to export database.');
+      }
+    } catch (e) {
+      alert(`Export error: ${e.message}`);
+    }
+  }
 
   // --- Overview & Stats ---
   async function loadStats() {
@@ -978,6 +1118,13 @@
 
     const startMigBtn = document.getElementById('migStartBtn');
     if (startMigBtn) startMigBtn.onclick = () => runMigration(false);
+
+    // Database & Backups buttons
+    const backupNowBtn = document.getElementById('backupNowBtn');
+    if (backupNowBtn) backupNowBtn.onclick = handleBackupNow;
+
+    const exportDbBtn = document.getElementById('exportDbBtn');
+    if (exportDbBtn) exportDbBtn.onclick = handleExportDb;
   });
 
 })();

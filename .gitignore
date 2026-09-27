@@ -7,6 +7,7 @@ data/*.db-journal
 data/*.db-wal
 data/*.db-shm
 data/*.json
+data/backups/
 uploads/
 temp_chunks/
 *.log

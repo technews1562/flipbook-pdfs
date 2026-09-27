@@ -98,12 +98,16 @@ app.use((err, req, res, next) => {
 });
 
 const db = require('./src/db/database');
+const backupService = require('./src/services/backup/backup.service');
 
 async function startServer() {
   try {
     console.log('[Server] Initializing database & syncing from Cloudflare R2...');
     await db.initializeDatabase();
     console.log('[Server] Database initialized successfully.');
+
+    // Start automated daily database backup scheduler (Local Disk + Cloudflare R2)
+    backupService.startDailyScheduler();
   } catch (err) {
     console.warn('[Server] Database initialization warning:', err.message);
   }
