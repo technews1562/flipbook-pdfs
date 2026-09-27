@@ -176,10 +176,14 @@
     window.removeEventListener('click', unlockAudio);
     window.removeEventListener('touchstart', unlockAudio);
     window.removeEventListener('keydown', unlockAudio);
+    window.removeEventListener('mousedown', unlockAudio);
+    window.removeEventListener('pointerdown', unlockAudio);
   };
-  window.addEventListener('click', unlockAudio, { once: true, passive: true });
-  window.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
-  window.addEventListener('keydown', unlockAudio, { once: true, passive: true });
+  window.addEventListener('click', unlockAudio, { passive: true });
+  window.addEventListener('touchstart', unlockAudio, { passive: true });
+  window.addEventListener('keydown', unlockAudio, { passive: true });
+  window.addEventListener('mousedown', unlockAudio, { passive: true });
+  window.addEventListener('pointerdown', unlockAudio, { passive: true });
 
   let soundTurnCount = 0;
 
@@ -309,8 +313,11 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          publicationId: publicationId,
           publication_id: publicationId,
+          eventType: eventType,
           event_type: eventType,
+          pageNumber: pageNumber,
           page_number: pageNumber,
           user_agent: navigator.userAgent,
           screen_res: `${window.screen.width}x${window.screen.height}`,
@@ -765,12 +772,13 @@
 
     // PageFlip Events
     pageFlip.on('flip', (e) => {
+      playPaperSound();
       updatePageDisplay(e.data);
       sendAnalytics('PAGE_TURN', e.data + 1);
     });
 
     pageFlip.on('changeState', (e) => {
-      if (e.data === 'flipping') {
+      if (e.data === 'flipping' || e.data === 'user_fold' || e.data === 'fold_corner') {
         playPaperSound();
       }
     });

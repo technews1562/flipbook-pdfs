@@ -18,19 +18,23 @@ const handleEvent = (req, res) => {
   try {
     const {
       publicationId,
+      publication_id,
       id,
-      eventType = 'VIEW',
+      eventType,
+      event_type,
       pageNumber,
+      page_number,
       duration,
       referrer
     } = req.body || {};
 
-    const targetPubId = publicationId || id;
+    const targetPubId = publicationId || publication_id || id;
     if (!targetPubId) {
       return res.status(200).json({ success: true, data: { recorded: false } });
     }
 
-    const normalizedEventType = (eventType || 'VIEW').toUpperCase();
+    const rawType = eventType || event_type || 'VIEW';
+    const normalizedEventType = (rawType || 'VIEW').toUpperCase();
     const validEvents = ['VIEW', 'PAGE_TURN', 'DOWNLOAD', 'SHARE', 'QR_SCAN'];
     const safeType = validEvents.includes(normalizedEventType) ? normalizedEventType : 'VIEW';
 
@@ -43,7 +47,7 @@ const handleEvent = (req, res) => {
     db.recordAnalyticsEvent({
       publication_id: targetPubId,
       event_type: safeType,
-      page_number: pageNumber,
+      page_number: pageNumber || page_number,
       duration_seconds: duration,
       referrer: (referrer || req.headers.referer || '').slice(0, 500),
       user_agent: (req.headers['user-agent'] || '').slice(0, 500),

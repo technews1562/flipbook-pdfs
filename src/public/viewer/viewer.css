@@ -319,7 +319,9 @@ a {
   position: relative;
   transform-origin: center center;
   transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: var(--fv-shadow-book);
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
   border-radius: 4px;
 }
 
@@ -328,12 +330,21 @@ a {
   background-color: #ffffff;
   overflow: hidden;
   position: relative;
-  box-shadow: 0 0 1px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--fv-shadow-book);
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   will-change: transform;
+}
+
+.st-page-wrapper,
+.st-wrapper,
+.st-container,
+.st-block {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 
 .st-page canvas {

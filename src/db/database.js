@@ -1183,11 +1183,11 @@ module.exports = {
     if (!id) return null;
     if (sqliteDb) {
       try {
-        const row = sqliteDb.prepare('SELECT * FROM publications WHERE id = ?').get(id);
+        const row = sqliteDb.prepare('SELECT * FROM publications WHERE id = ? OR slug = ?').get(id, id);
         if (row) return row;
       } catch (e) {}
     }
-    return memoryStore.find(p => p.id === id) || null;
+    return memoryStore.find(p => p.id === id || p.slug === id) || null;
   },
 
   getPublicationByHash(hash, userId = null) {
