@@ -116,45 +116,61 @@
     }
   }
 
-  // --- Heyzine-Grade Authentic Recorded Page Flip Sound System ---
-  let pageFlipAudioBuffer = null;
-  let audioCtx = null;
-  const pageFlipAudioPool = [];
-  const POOL_SIZE = 4;
-  let audioPoolIndex = 0;
+  // --- Authentic Heyzine Real Sound System (flip-ct-sm, flip-ct-md, flip-ct-lg) ---
+  const SOUND_URLS = [
+    '/viewer/flip-ct-sm.mp3',
+    '/viewer/flip-ct-md.mp3',
+    '/viewer/flip-ct-lg.mp3'
+  ];
 
-  // Pre-initialize audio elements for rapid HTML5 playback
-  try {
-    for (let i = 0; i < POOL_SIZE; i++) {
-      const audio = new Audio('/viewer/page-flip.mp3');
-      audio.preload = 'auto';
-      pageFlipAudioPool.push(audio);
+  const audioBuffers = {};
+  const html5AudioPool = {};
+  let audioCtx = null;
+  let audioUnlocked = false;
+
+  // Initialize HTML5 Audio elements for each clip
+  SOUND_URLS.forEach(url => {
+    html5AudioPool[url] = [];
+    for (let i = 0; i < 3; i++) {
+      try {
+        const a = new Audio(url);
+        a.preload = 'auto';
+        html5AudioPool[url].push(a);
+      } catch (e) {}
     }
-  } catch (e) {}
+  });
 
   function initAudioEngine() {
     if (!audioCtx) {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (AudioContextClass) {
         audioCtx = new AudioContextClass();
-        fetch('/viewer/page-flip.mp3')
-          .then(res => {
-            if (!res.ok) throw new Error('Sound fetch error');
-            return res.arrayBuffer();
-          })
-          .then(buffer => audioCtx.decodeAudioData(buffer))
-          .then(decoded => {
-            pageFlipAudioBuffer = decoded;
-          })
-          .catch(() => {});
       }
     }
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
+    if (audioCtx) {
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+      // Pre-fetch and decode all 3 sound files into memory for 0ms latency
+      SOUND_URLS.forEach(url => {
+        if (!audioBuffers[url]) {
+          fetch(url)
+            .then(res => {
+              if (!res.ok) throw new Error('Sound load error: ' + url);
+              return res.arrayBuffer();
+            })
+            .then(buf => audioCtx.decodeAudioData(buf))
+            .then(decoded => {
+              audioBuffers[url] = decoded;
+            })
+            .catch(() => {});
+        }
+      });
     }
+    audioUnlocked = true;
   }
 
-  // Pre-unlock audio on user's first physical interaction
+  // Pre-unlock audio on user's first physical gesture anywhere on page
   const unlockAudio = () => {
     initAudioEngine();
     window.removeEventListener('click', unlockAudio);
@@ -165,27 +181,39 @@
   window.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
   window.addEventListener('keydown', unlockAudio, { once: true, passive: true });
 
-  // Play Crisp Physical Paper Flip Audio
-  function playPaperSound() {
+  let soundTurnCount = 0;
+
+  // Play Crisp Physical Paper Flip Audio (Heyzine Exact Sound)
+  function playPaperSound(size = null) {
     if (!soundEnabled) return;
     const now = Date.now();
-    if (now - lastPageTurnTime < 120) return; // Debounce rapid multi-triggers
+    if (now - lastPageTurnTime < 90) return; // Debounce
     lastPageTurnTime = now;
 
     try {
       initAudioEngine();
 
-      // Priority 1: Web Audio Buffer (0ms instant latency, true concurrent mixing)
-      if (audioCtx && pageFlipAudioBuffer) {
+      // Choose sound: lg for long jumps/cover, or alternate sm and md for single page turns
+      let soundUrl;
+      if (size === 'lg') {
+        soundUrl = '/viewer/flip-ct-lg.mp3';
+      } else if (size === 'sm') {
+        soundUrl = '/viewer/flip-ct-sm.mp3';
+      } else {
+        soundTurnCount++;
+        soundUrl = soundTurnCount % 2 === 0 ? '/viewer/flip-ct-md.mp3' : '/viewer/flip-ct-sm.mp3';
+      }
+
+      // Priority 1: Web Audio Buffer (0ms instant playback, perfectly crisp)
+      if (audioCtx && audioBuffers[soundUrl]) {
         if (audioCtx.state === 'suspended') {
           audioCtx.resume().catch(() => {});
         }
         const source = audioCtx.createBufferSource();
-        source.buffer = pageFlipAudioBuffer;
+        source.buffer = audioBuffers[soundUrl];
 
         const gainNode = audioCtx.createGain();
-        // Slight natural volume dynamics
-        gainNode.gain.value = 0.88;
+        gainNode.gain.value = 0.92;
 
         source.connect(gainNode);
         gainNode.connect(audioCtx.destination);
@@ -194,17 +222,17 @@
       }
 
       // Priority 2: HTML5 Audio Pool Fallback
-      if (pageFlipAudioPool.length > 0) {
-        const audio = pageFlipAudioPool[audioPoolIndex];
-        audioPoolIndex = (audioPoolIndex + 1) % pageFlipAudioPool.length;
+      const pool = html5AudioPool[soundUrl] || html5AudioPool['/viewer/flip-ct-md.mp3'];
+      if (pool && pool.length > 0) {
+        const audio = pool.find(a => a.paused || a.ended) || pool[0];
         if (audio) {
           audio.currentTime = 0;
-          audio.volume = 0.88;
+          audio.volume = 0.92;
           audio.play().catch(() => {});
         }
       }
     } catch (e) {
-      // Audio autoplay policy fallback
+      // Audio autoplay restrictions
     }
   }
 
@@ -711,7 +739,6 @@
 
     // PageFlip Events
     pageFlip.on('flip', (e) => {
-      playPaperSound();
       updatePageDisplay(e.data);
       sendAnalytics('PAGE_TURN', e.data + 1);
     });
@@ -729,12 +756,12 @@
     updatePageDisplay(startPageIndex);
 
     // Dock Navigation Buttons
-    if (el.prevBtn) el.prevBtn.onclick = () => pageFlip.flipPrev();
-    if (el.nextBtn) el.nextBtn.onclick = () => pageFlip.flipNext();
-    if (el.firstBtn) el.firstBtn.onclick = () => pageFlip.flip(0);
-    if (el.lastBtn) el.lastBtn.onclick = () => pageFlip.flip(numPages - 1);
-    if (el.prevArrow) el.prevArrow.onclick = () => pageFlip.flipPrev();
-    if (el.nextArrow) el.nextArrow.onclick = () => pageFlip.flipNext();
+    if (el.prevBtn) el.prevBtn.onclick = () => { playPaperSound('sm'); pageFlip.flipPrev(); };
+    if (el.nextBtn) el.nextBtn.onclick = () => { playPaperSound('sm'); pageFlip.flipNext(); };
+    if (el.firstBtn) el.firstBtn.onclick = () => { playPaperSound('lg'); pageFlip.flip(0); };
+    if (el.lastBtn) el.lastBtn.onclick = () => { playPaperSound('lg'); pageFlip.flip(numPages - 1); };
+    if (el.prevArrow) el.prevArrow.onclick = () => { playPaperSound('sm'); pageFlip.flipPrev(); };
+    if (el.nextArrow) el.nextArrow.onclick = () => { playPaperSound('sm'); pageFlip.flipNext(); };
 
     // Scrubber Navigation
     if (el.scrubber) {
