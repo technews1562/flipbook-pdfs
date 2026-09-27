@@ -1291,9 +1291,9 @@ module.exports = {
       return tB - tA;
     });
 
-    // If authenticated regular user, filter only user's publications
+    // If authenticated regular user, filter user's publications and legacy admin/unassigned publications
     if (userId && !isAdmin) {
-      list = list.filter(p => p.user_id === userId);
+      list = list.filter(p => p.user_id === userId || p.user_id === 'usr_system_admin' || !p.user_id);
     } else if (!userId && !isAdmin) {
       // Unauthenticated / Blogger public feed: only return public and published
       list = list.filter(p => p.published === 1 && (p.visibility === 'PUBLIC' || !p.visibility));
