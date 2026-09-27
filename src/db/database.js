@@ -44,7 +44,7 @@ const DEFAULT_PLANS = [
   {
     id: 'free',
     name: 'Free',
-    max_publications: 5,
+    max_publications: 1,
     max_storage_bytes: 100 * 1024 * 1024, // 100 MB
     max_pdf_size_bytes: 25 * 1024 * 1024, // 25 MB
     max_pages_per_doc: 30,
@@ -538,9 +538,9 @@ try {
     );
   `);
 
-  // Seed Default Plans into SQLite
+  // Seed / Sync Default Plans into SQLite
   const insertPlanStmt = sqliteDb.prepare(`
-    INSERT OR IGNORE INTO plans (
+    INSERT OR REPLACE INTO plans (
       id, name, max_publications, max_storage_bytes, max_pdf_size_bytes,
       max_pages_per_doc, has_branding, allow_password_protect, allow_analytics,
       allow_download, created_at
