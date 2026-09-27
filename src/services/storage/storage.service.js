@@ -68,6 +68,43 @@ class StorageService {
   }
 
   /**
+   * Upload file from disk path directly to storage using streaming (bounded memory)
+   * @param {string} key - storage key e.g. users/{userId}/publications/{pubId}/original.pdf
+   * @param {string} filePath - absolute local path to file
+   * @param {string} contentType - mime type e.g. application/pdf
+   * @returns {Promise<{ key: string, url: string }>}
+   */
+  async uploadFile(key, filePath, contentType = 'application/pdf') {
+    const cleanKey = key.replace(/^\/+/, '');
+    const stat = fs.statSync(filePath);
+
+    if (this.isR2Configured) {
+      const fileStream = fs.createReadStream(filePath);
+      const command = new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: cleanKey,
+        Body: fileStream,
+        ContentType: contentType,
+        ContentLength: stat.size
+      });
+
+      await this.s3.send(command);
+      const url = this.getUrl(cleanKey);
+      return { key: cleanKey, url };
+    } else {
+      const targetPath = path.join(this.localDir, cleanKey);
+      const targetDir = path.dirname(targetPath);
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+      fs.copyFileSync(filePath, targetPath);
+      const url = this.getUrl(cleanKey);
+      return { key: cleanKey, url };
+    }
+  }
+
+
+  /**
    * Delete object from storage
    * @param {string} key
    */

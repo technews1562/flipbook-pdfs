@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const config = require('../../config');
 const db = require('../../db/database');
@@ -441,30 +442,47 @@ class UploadService {
     db.updateUploadSession(uploadId, { status: 'COMPLETING' });
 
     const sessionDir = this.getUploadDir(uploadId);
+    const assembledPath = path.join(sessionDir, 'assembled.pdf');
 
-    // Verify all chunks are present on disk
-    const chunkBuffers = [];
+    // Verify all chunks are present on disk and stream sequentially to assembled.pdf
+    const writeStream = fs.createWriteStream(assembledPath);
+    const hash = crypto.createHash('sha256');
+    let assembledSize = 0;
+
     for (let i = 0; i < session.total_chunks; i++) {
       const p = path.join(sessionDir, `chunk_${i}`);
       if (!fs.existsSync(p)) {
+        writeStream.destroy();
+        try { fs.unlinkSync(assembledPath); } catch (e) {}
         db.updateUploadSession(uploadId, { status: 'UPLOADING' });
         const err = new Error(`Incomplete upload: Missing chunk ${i + 1} of ${session.total_chunks}.`);
         err.code = 'INCOMPLETE_CHUNKS';
         err.status = 400;
         throw err;
       }
-      chunkBuffers.push(fs.readFileSync(p));
+
+      await new Promise((resolve, reject) => {
+        const readStream = fs.createReadStream(p);
+        readStream.on('data', (chunk) => {
+          hash.update(chunk);
+          assembledSize += chunk.length;
+        });
+        readStream.on('error', reject);
+        readStream.on('end', resolve);
+        readStream.pipe(writeStream, { end: false });
+      });
     }
 
-    // Assemble complete PDF
-    const completeBuffer = Buffer.concat(chunkBuffers);
+    await new Promise((resolve) => writeStream.end(resolve));
+    const calculatedHash = hash.digest('hex');
 
     // Step 1: Validate PDF structure & metadata (magic bytes %PDF- and structure)
     let pdfMeta;
     try {
-      pdfMeta = await pdfService.validateAndInspect(completeBuffer);
+      pdfMeta = await pdfService.validateAndInspect(assembledPath);
     } catch (valErr) {
       db.updateUploadSession(uploadId, { status: 'UPLOADING' });
+      try { fs.unlinkSync(assembledPath); } catch (e) {}
       const err = new Error(`Invalid PDF document: ${valErr.message}`);
       err.code = 'INVALID_PDF';
       err.status = 400;
@@ -475,6 +493,7 @@ class UploadService {
     const plan = getUserPlan(user);
     if (!isAdmin && plan.max_pages_per_doc !== -1 && pdfMeta.pageCount > plan.max_pages_per_doc) {
       db.updateUploadSession(uploadId, { status: 'UPLOADING' });
+      try { fs.unlinkSync(assembledPath); } catch (e) {}
       const err = new Error(`Document page count (${pdfMeta.pageCount} pages) exceeds your ${plan.name} plan limit of ${plan.max_pages_per_doc} pages.`);
       err.code = 'PAGE_LIMIT_EXCEEDED';
       err.status = 400;
@@ -482,15 +501,15 @@ class UploadService {
     }
 
     // Step 3: Verify client-provided hash if supplied
-    if (session.file_hash && session.file_hash !== pdfMeta.fileHash) {
-      console.warn(`[Upload Hash Check] Calculated ${pdfMeta.fileHash} vs client ${session.file_hash}`);
+    if (session.file_hash && session.file_hash !== calculatedHash) {
+      console.warn(`[Upload Hash Check] Calculated ${calculatedHash} vs client ${session.file_hash}`);
     }
 
     // Step 4: Duplicate detection for the same user
-    const existing = db.getPublicationByHash(pdfMeta.fileHash, session.user_id);
+    const existing = db.getPublicationByHash(calculatedHash, session.user_id);
     if (existing) {
       this.cleanupTempDir(uploadId);
-      db.updateUploadSession(uploadId, { status: 'COMPLETED', file_hash: pdfMeta.fileHash });
+      db.updateUploadSession(uploadId, { status: 'COMPLETED', file_hash: calculatedHash });
       return {
         publication: {
           id: existing.id,
@@ -509,12 +528,14 @@ class UploadService {
       };
     }
 
-    // Step 5: R2 Structured Namespacing (users/{userId}/publications/{publicationId}/original.pdf)
+    // Step 5: R2 Structured Namespacing (users/{userId}/publications/{publicationId}/original.pdf) via Streaming
     const pubId = session.publication_id;
     const pubUserId = session.user_id;
     const storageKey = `users/${pubUserId}/publications/${pubId}/original.pdf`;
 
-    const { url: pdfUrl } = await storageService.upload(storageKey, completeBuffer, 'application/pdf');
+    await storageService.uploadFile(storageKey, assembledPath, 'application/pdf');
+    const pdfUrl = `/api/public/${pubId}/pdf`;
+
 
     // Step 6: Server-side Cover Generation & Upload
     let coverUrl = '';
@@ -558,8 +579,8 @@ class UploadService {
       pdf_url: pdfUrl,
       cover_url: coverUrl,
       page_count: pdfMeta.pageCount,
-      file_size: completeBuffer.length,
-      file_hash: pdfMeta.fileHash,
+      file_size: assembledSize || pdfMeta.fileSize,
+      file_hash: calculatedHash || pdfMeta.fileHash,
       status: 'READY',
       published: 1,
       visibility: pubVisibility,
@@ -570,11 +591,12 @@ class UploadService {
     // Step 9: Mark Session COMPLETED and clean up temp files
     db.updateUploadSession(uploadId, {
       status: 'COMPLETED',
-      file_hash: pdfMeta.fileHash,
-      received_size: completeBuffer.length,
+      file_hash: calculatedHash || pdfMeta.fileHash,
+      received_size: assembledSize || pdfMeta.fileSize,
       received_chunks: session.total_chunks
     });
     this.cleanupTempDir(uploadId);
+
 
     const publicUrl = config.getPublicViewerUrl(pubId);
 

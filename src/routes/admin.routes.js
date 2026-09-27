@@ -507,12 +507,14 @@ router.get('/db/backups/:filename', (req, res) => {
 });
 
 // -------------------------------------------------------------
+// -------------------------------------------------------------
 // POST /api/admin/db/restore (Restore from Payload)
 // -------------------------------------------------------------
-router.post('/db/restore', (req, res) => {
+router.post('/db/restore', async (req, res) => {
   try {
     const backupData = req.body;
-    const result = backupService.restoreFromData(backupData);
+    const adminId = req.user ? req.user.id : 'ADMIN';
+    const result = await backupService.restoreFromData(backupData, adminId);
     return res.status(200).json({
       success: true,
       message: 'Database successfully restored from backup snapshot.',

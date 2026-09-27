@@ -1,20 +1,53 @@
+const fs = require('fs');
 const crypto = require('crypto');
 const { PDFDocument } = require('pdf-lib');
 
 class PdfService {
   /**
-   * Validate PDF magic bytes and parse structure
-   * @param {Buffer} buffer
+   * Validate PDF magic bytes and parse structure from buffer or file path
+   * @param {Buffer|string} input
    */
-  async validateAndInspect(buffer) {
-    if (!buffer || buffer.length < 10) {
-      throw new Error('Invalid file: empty or corrupted PDF buffer.');
-    }
+  async validateAndInspect(input) {
+    let buffer;
+    let fileSize;
 
-    // Check magic bytes %PDF-
-    const header = buffer.subarray(0, 5).toString('ascii');
-    if (header !== '%PDF-') {
-      throw new Error('Invalid file format: file does not have a valid PDF header.');
+    if (typeof input === 'string') {
+      const filePath = input;
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`PDF file not found at ${filePath}`);
+      }
+      const stat = fs.statSync(filePath);
+      fileSize = stat.size;
+
+      if (fileSize < 10) {
+        throw new Error('Invalid file: empty or corrupted PDF.');
+      }
+
+      // Check magic bytes %PDF-
+      const fd = fs.openSync(filePath, 'r');
+      const headerBuf = Buffer.alloc(1024);
+      fs.readSync(fd, headerBuf, 0, 1024, 0);
+      fs.closeSync(fd);
+
+      const header = headerBuf.subarray(0, 5).toString('ascii');
+      if (header !== '%PDF-') {
+        throw new Error('Invalid file format: file does not have a valid PDF header.');
+      }
+
+      buffer = fs.readFileSync(filePath);
+    } else {
+      buffer = input;
+      if (!buffer || buffer.length < 10) {
+        throw new Error('Invalid file: empty or corrupted PDF buffer.');
+      }
+
+      // Check magic bytes %PDF-
+      const header = buffer.subarray(0, 5).toString('ascii');
+      if (header !== '%PDF-') {
+        throw new Error('Invalid file format: file does not have a valid PDF header.');
+      }
+
+      fileSize = buffer.length;
     }
 
     try {
@@ -33,7 +66,7 @@ class PdfService {
       const author = pdfDoc.getAuthor() || '';
       const subject = pdfDoc.getSubject() || '';
 
-      // Compute SHA-256 hash for duplicate detection
+      // Compute SHA-256 hash
       const fileHash = crypto.createHash('sha256').update(buffer).digest('hex');
 
       return {
@@ -42,12 +75,13 @@ class PdfService {
         dimensions: { width, height },
         meta: { title, author, subject },
         fileHash,
-        fileSize: buffer.length
+        fileSize
       };
     } catch (err) {
       throw new Error(`PDF validation error: ${err.message}`);
     }
   }
+
 
   /**
    * Generate an ultra-clean, lightweight SVG vector cover banner for instant homepage rendering

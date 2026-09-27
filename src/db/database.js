@@ -1347,8 +1347,8 @@ module.exports = {
     if (userId && !isAdmin) {
       list = list.filter(p => p.user_id === userId);
     } else if (!userId && !isAdmin) {
-      // Unauthenticated / Blogger public feed: only return public and published
-      list = list.filter(p => p.published === 1 && (p.visibility === 'PUBLIC' || !p.visibility));
+      // Unauthenticated / Blogger public feed: only return public, published, and ready publications
+      list = list.filter(p => p.published === 1 && (p.status === 'PUBLISHED' || p.status === 'READY') && (p.visibility === 'PUBLIC' || !p.visibility));
     }
 
     if (category && category.toLowerCase() !== 'all') {
@@ -1373,8 +1373,14 @@ module.exports = {
     const start = (page - 1) * limit;
     const paginated = list.slice(start, start + limit);
 
+    // Strip sensitive fields (password_hash, storage_key) for public/user responses
+    const sanitizedList = paginated.map(p => {
+      const { password_hash, storage_key, ...safePub } = p;
+      return safePub;
+    });
+
     return {
-      publications: paginated,
+      publications: sanitizedList,
       pagination: {
         page,
         limit,
@@ -1424,6 +1430,16 @@ module.exports = {
     if (analyticsEventsStore.length > 5000) analyticsEventsStore.pop();
     saveJsonStore();
     return event;
+  },
+
+  getPublicationAnalytics(publicationId) {
+    if (!publicationId) return [];
+    if (sqliteDb) {
+      try {
+        return sqliteDb.prepare('SELECT * FROM analytics_events WHERE publication_id = ? ORDER BY created_at DESC LIMIT 1000').all(publicationId);
+      } catch (e) {}
+    }
+    return analyticsEventsStore.filter(a => a.publication_id === publicationId);
   },
 
   getPublicPublicationById(id) {
@@ -1549,30 +1565,113 @@ module.exports = {
   },
 
   restoreRawStores(data = {}) {
-    if (data.users && Array.isArray(data.users)) {
-      usersStore = data.users;
-      try {
-        fs.writeFileSync(jsonUsersPath, JSON.stringify(usersStore, null, 2), 'utf8');
-      } catch (e) {}
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid restore payload: data must be an object.');
     }
-    if (data.publications && Array.isArray(data.publications)) {
-      memoryStore = data.publications;
-      try {
-        fs.writeFileSync(jsonDbPath, JSON.stringify(memoryStore, null, 2), 'utf8');
-      } catch (e) {}
-    }
+
     if (data.plans && Array.isArray(data.plans)) {
       plansStore = data.plans;
-      try {
-        fs.writeFileSync(jsonPlansPath, JSON.stringify(plansStore, null, 2), 'utf8');
-      } catch (e) {}
+      if (sqliteDb) {
+        try {
+          const insertPlan = sqliteDb.prepare(`
+            INSERT OR REPLACE INTO plans (
+              id, name, max_publications, max_storage_bytes, max_pdf_size_bytes,
+              max_pages_per_doc, has_branding, allow_password_protect, allow_analytics,
+              allow_download, created_at
+            ) VALUES (
+              @id, @name, @max_publications, @max_storage_bytes, @max_pdf_size_bytes,
+              @max_pages_per_doc, @has_branding, @allow_password_protect, @allow_analytics,
+              @allow_download, @created_at
+            )
+          `);
+          for (const plan of plansStore) {
+            insertPlan.run(plan);
+          }
+        } catch (e) {}
+      }
+      try { fs.writeFileSync(jsonPlansPath, JSON.stringify(plansStore, null, 2), 'utf8'); } catch (e) {}
     }
+
+    if (data.users && Array.isArray(data.users)) {
+      usersStore = data.users;
+      if (sqliteDb) {
+        try {
+          const insertUser = sqliteDb.prepare(`
+            INSERT OR REPLACE INTO users (
+              id, email, password_hash, full_name, avatar_url, role, status,
+              plan_id, storage_used_bytes, publication_count, created_at, updated_at
+            ) VALUES (
+              @id, @email, @password_hash, @full_name, @avatar_url, @role, @status,
+              @plan_id, @storage_used_bytes, @publication_count, @created_at, @updated_at
+            )
+          `);
+          for (const u of usersStore) {
+            if (u.id && u.email && u.password_hash) {
+              insertUser.run({
+                status: 'ACTIVE',
+                storage_used_bytes: 0,
+                publication_count: 0,
+                updated_at: new Date().toISOString(),
+                ...u
+              });
+            }
+          }
+        } catch (e) {}
+      }
+      try { fs.writeFileSync(jsonUsersPath, JSON.stringify(usersStore, null, 2), 'utf8'); } catch (e) {}
+    }
+
+    if (data.publications && Array.isArray(data.publications)) {
+      memoryStore = data.publications;
+      if (sqliteDb) {
+        try {
+          const insertPub = sqliteDb.prepare(`
+            INSERT OR REPLACE INTO publications (
+              id, user_id, title, slug, category, description, author,
+              pdf_filename, storage_key, pdf_url, cover_url,
+              page_count, file_size, file_hash, status, published, visibility,
+              password_hash, has_branding, download_enabled, share_enabled,
+              view_count, blogger_post_id, blogger_post_url, published_at,
+              created_at, updated_at
+            ) VALUES (
+              @id, @user_id, @title, @slug, @category, @description, @author,
+              @pdf_filename, @storage_key, @pdf_url, @cover_url,
+              @page_count, @file_size, @file_hash, @status, @published, @visibility,
+              @password_hash, @has_branding, @download_enabled, @share_enabled,
+              @view_count, @blogger_post_id, @blogger_post_url, @published_at,
+              @created_at, @updated_at
+            )
+          `);
+          for (const pub of memoryStore) {
+            if (pub.id && pub.title && pub.storage_key) {
+              insertPub.run({
+                user_id: SYSTEM_ADMIN_ID,
+                category: 'Magazine',
+                page_count: 1,
+                file_size: 0,
+                status: 'READY',
+                published: 1,
+                visibility: 'PUBLIC',
+                has_branding: 1,
+                download_enabled: 1,
+                share_enabled: 1,
+                view_count: 0,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                ...pub
+              });
+            }
+          }
+        } catch (e) {}
+      }
+      try { fs.writeFileSync(jsonDbPath, JSON.stringify(memoryStore, null, 2), 'utf8'); } catch (e) {}
+    }
+
     if (data.analytics && Array.isArray(data.analytics)) {
       analyticsEventsStore = data.analytics;
-      try {
-        fs.writeFileSync(jsonAnalyticsEventsPath, JSON.stringify(analyticsEventsStore, null, 2), 'utf8');
-      } catch (e) {}
+      try { fs.writeFileSync(jsonAnalyticsEventsPath, JSON.stringify(analyticsEventsStore, null, 2), 'utf8'); } catch (e) {}
     }
+
     return {
       success: true,
       restored_counts: {
@@ -1583,3 +1682,4 @@ module.exports = {
     };
   }
 };
+

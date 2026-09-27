@@ -4,233 +4,149 @@ const multer = require('multer');
 const db = require('../db/database');
 const storageService = require('../services/storage/storage.service');
 const pdfService = require('../services/pdf/pdf.service');
+const uploadService = require('../services/upload/upload.service');
+const authService = require('../services/auth/auth.service');
 const bloggerService = require('../services/blogger/blogger.service');
 const { requireAuth, optionalAuth, requirePublicationOwner } = require('../middleware/auth');
 const { getUserPlan } = require('../middleware/planValidator');
 const config = require('../config');
 
-// Configure Multer
+// Configure Multer for legacy fallback requests
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB max per single request or chunk
 });
 
-// In-Memory Chunk Sessions Store (Auto-cleaned)
-const chunkSessions = new Map();
-
-function cleanOldSessions() {
-  const now = Date.now();
-  for (const [id, session] of chunkSessions.entries()) {
-    if (now - session.createdAt > 600000) { // 10 minutes
-      chunkSessions.delete(id);
-    }
-  }
-}
-setInterval(cleanOldSessions, 60000);
-
-// Helper to generate Unique Publication ID
-function generatePubId() {
-  const timestamp = Date.now().toString(36);
-  const randomPart = Math.random().toString(36).substring(2, 8);
-  return `pub_${timestamp}${randomPart}`;
-}
-
 // -------------------------------------------------------------
-// POST /api/upload-chunk (Chunked Streaming Upload)
+// POST /api/upload-chunk (@deprecated Legacy Blogger Compatibility)
+// Delegates to canonical UploadService
 // -------------------------------------------------------------
-router.post('/upload-chunk', optionalAuth, upload.single('chunk'), (req, res) => {
+router.post('/upload-chunk', optionalAuth, upload.single('chunk'), async (req, res) => {
   try {
     const { uploadId, chunkIndex, totalChunks, filename } = req.body;
 
-    if (!uploadId || chunkIndex === undefined || !totalChunks || !req.file) {
+    if (!uploadId || chunkIndex === undefined || !req.file) {
       return res.status(400).json({
         success: false,
         error: { code: 'INVALID_CHUNK', message: 'Missing chunk metadata or binary payload.' }
       });
     }
 
+    const targetUserId = req.user ? req.user.id : db.SYSTEM_ADMIN_ID;
     const idx = parseInt(chunkIndex, 10);
-    const total = parseInt(totalChunks, 10);
+    const total = parseInt(totalChunks, 10) || 1;
 
-    if (!chunkSessions.has(uploadId)) {
-      chunkSessions.set(uploadId, {
-        filename: filename || 'publication.pdf',
-        totalChunks: total,
-        chunks: new Array(total),
-        userId: req.user ? req.user.id : db.SYSTEM_ADMIN_ID,
-        createdAt: Date.now()
+    // Ensure session exists in database
+    let session = db.getUploadSessionById(uploadId);
+    if (!session) {
+      const cleanFilename = (filename || 'publication.pdf').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const estSize = total * (config.upload?.chunkSize || 2097152);
+      session = db.createUploadSession({
+        id: uploadId,
+        user_id: targetUserId,
+        filename: cleanFilename,
+        expected_size: estSize,
+        total_chunks: total,
+        status: 'INITIATED',
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString()
       });
     }
 
-    const session = chunkSessions.get(uploadId);
-    session.chunks[idx] = req.file.buffer;
-
-    const receivedCount = session.chunks.filter(Boolean).length;
+    const result = await uploadService.saveChunk({
+      userId: targetUserId,
+      uploadId,
+      chunkIndex: idx,
+      buffer: req.file.buffer
+    });
 
     return res.status(200).json({
       success: true,
       data: {
         uploadId,
-        chunkIndex: idx,
-        receivedChunks: receivedCount,
-        totalChunks: total
+        chunkIndex: result.chunkIndex,
+        receivedChunks: result.receivedChunks,
+        totalChunks: result.totalChunks,
+        progressPercent: result.progressPercent
       }
     });
   } catch (err) {
-    console.error('[Upload Chunk Error]', err);
-    return res.status(500).json({
+    console.error('[Legacy Upload Chunk Error]', err);
+    const status = err.status || 500;
+    return res.status(status).json({
       success: false,
-      error: { code: 'CHUNK_FAILED', message: err.message }
+      error: { code: err.code || 'CHUNK_FAILED', message: err.message }
     });
   }
 });
 
 // -------------------------------------------------------------
-// POST /api/finalize-upload (Reassemble, Store in R2 & Save Record)
+// POST /api/finalize-upload (@deprecated Legacy Blogger Compatibility)
+// Delegates to canonical UploadService
 // -------------------------------------------------------------
 router.post('/finalize-upload', optionalAuth, async (req, res) => {
   const startTime = Date.now();
   try {
     const { uploadId, filename, title, category, description, author, coverBase64, visibility, password } = req.body;
 
-    if (!uploadId || !chunkSessions.has(uploadId)) {
-      return res.status(404).json({
-        success: false,
-        error: { code: 'SESSION_NOT_FOUND', message: 'Upload session not found or expired. Please retry.' }
-      });
-    }
-
-    const session = chunkSessions.get(uploadId);
-    const missingIndex = session.chunks.findIndex(c => !c);
-
-    if (missingIndex !== -1) {
+    if (!uploadId) {
       return res.status(400).json({
         success: false,
-        error: { code: 'INCOMPLETE_CHUNKS', message: `Missing chunk ${missingIndex + 1} of ${session.totalChunks}.` }
+        error: { code: 'MISSING_UPLOAD_ID', message: 'Missing uploadId parameter.' }
       });
     }
 
-    // Reassemble binary chunks
-    const completeBuffer = Buffer.concat(session.chunks);
-    const targetUserId = req.user ? req.user.id : (session.userId || db.SYSTEM_ADMIN_ID);
-    chunkSessions.delete(uploadId); // free memory
+    const session = db.getUploadSessionById(uploadId);
+    const targetUserId = req.user ? req.user.id : (session ? session.user_id : db.SYSTEM_ADMIN_ID);
 
-    // Resolve User & Plan details
-    const user = db.getUserById(targetUserId);
-    const plan = getUserPlan(user);
-
-    // Sanitize and prepare document details
-    const rawFilename = (filename || session.filename || 'publication.pdf').replace(/[^a-zA-Z0-9._-]/g, '_');
-    const pubTitle = title ? title.trim() : rawFilename.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ').trim();
-    const pubCategory = category || 'Magazine';
-    const pubDescription = description || '';
-    const pubAuthor = author || '';
-
-    // Step 1: Validate PDF structure & extract metadata
-    const pdfMeta = await pdfService.validateAndInspect(completeBuffer);
-
-    // Step 2: Check for existing duplicate under same user
-    const existing = db.getPublicationByHash(pdfMeta.fileHash, targetUserId);
-    if (existing) {
-      console.log(`[Upload] Duplicate detected for user ${targetUserId}: ${existing.id}`);
-      return res.status(200).json({
-        success: true,
-        data: {
-          duplicate: true,
-          publicationId: existing.id,
-          id: existing.id,
-          user_id: existing.user_id || targetUserId,
-          title: existing.title,
-          pageCount: existing.page_count,
-          pdfUrl: existing.pdf_url,
-          coverUrl: existing.cover_url,
-          postUrl: existing.blogger_post_url || `https://${config.blogger.blogDomain}/#doc=${existing.id}`,
-          status: existing.status,
-          message: 'Document already exists in your library.'
-        }
-      });
-    }
-
-    // Step 3: Generate Unique Publication ID & Storage Key
-    const pubId = generatePubId();
-    const datePrefix = new Date().toISOString().slice(0, 7).replace('-', '/'); // YYYY/MM
-    const storageKey = `uploads/${datePrefix}/${pubId}/${rawFilename}`;
-
-    // Step 4: Upload PDF to Cloudflare R2 / Object Storage
-    const { url: pdfUrl } = await storageService.upload(storageKey, completeBuffer, 'application/pdf');
-
-    // Step 5: Handle Cover Generation & Upload
-    let coverUrl = '';
-    const coverKey = `covers/${pubId}.svg`;
-    if (coverBase64 && coverBase64.startsWith('data:image/')) {
-      const parts = coverBase64.split(',');
-      const imgBuffer = Buffer.from(parts[1], 'base64');
-      const imgExt = coverBase64.includes('image/webp') ? 'webp' : 'jpg';
-      const imgMime = coverBase64.includes('image/webp') ? 'image/webp' : 'image/jpeg';
-      const customCoverKey = `covers/${pubId}.${imgExt}`;
-      const coverRes = await storageService.upload(customCoverKey, imgBuffer, imgMime);
-      coverUrl = coverRes.url;
-    } else {
-      const coverSvg = pdfService.generateVectorCoverSvg(pubTitle, pubCategory, pdfMeta.pageCount);
-      const coverRes = await storageService.upload(coverKey, coverSvg, 'image/svg+xml');
-      coverUrl = coverRes.url;
-    }
-
-    // Step 6: Save Publication Record in Database with Multi-Tenant Ownership
-    const pubRecord = db.createPublication({
-      id: pubId,
-      user_id: targetUserId,
-      title: pubTitle,
-      category: pubCategory,
-      description: pubDescription,
-      author: pubAuthor,
-      pdf_filename: rawFilename,
-      storage_key: storageKey,
-      pdf_url: pdfUrl,
-      cover_url: coverUrl,
-      page_count: pdfMeta.pageCount,
-      file_size: pdfMeta.fileSize,
-      file_hash: pdfMeta.fileHash,
-      status: 'READY',
-      published: 1,
-      visibility: visibility || 'PUBLIC',
-      has_branding: plan.has_branding ? 1 : 0
+    const completionResult = await uploadService.completeUpload({
+      userId: targetUserId,
+      uploadId,
+      title,
+      category,
+      description,
+      author,
+      coverBase64,
+      visibility,
+      password
     });
 
-    console.log(`[Upload Finalized] Publication ${pubId} (${pubTitle}) saved to R2 & DB (User: ${targetUserId}) in ${Date.now() - startTime}ms`);
+    const pub = completionResult.publication;
+    const fullPub = db.getPublicationById(pub.id);
 
     return res.status(200).json({
       success: true,
       data: {
-        publicationId: pubId,
-        id: pubId,
+        publicationId: pub.id,
+        id: pub.id,
         user_id: targetUserId,
-        title: pubTitle,
-        category: pubCategory,
-        pageCount: pdfMeta.pageCount,
-        fileSize: pdfMeta.fileSize,
-        pdfUrl: pdfUrl,
-        pdf_url: pdfUrl,
-        coverUrl: coverUrl,
-        cover_url: coverUrl,
-        postUrl: `https://${config.blogger.blogDomain}/#doc=${pubId}`,
-        status: 'READY',
-        has_branding: pubRecord.has_branding,
+        title: pub.title,
+        category: pub.category,
+        pageCount: pub.pageCount,
+        fileSize: pub.fileSize,
+        pdfUrl: pub.pdfUrl,
+        pdf_url: pub.pdfUrl,
+        coverUrl: pub.coverUrl,
+        cover_url: pub.coverUrl,
+        postUrl: fullPub && fullPub.blogger_post_url ? fullPub.blogger_post_url : `https://${config.blogger.blogDomain}/#doc=${pub.id}`,
+        status: pub.status,
+        has_branding: pub.hasBranding,
         timeElapsedMs: Date.now() - startTime
       }
     });
 
   } catch (err) {
-    console.error('[Finalize Error]', err);
-    return res.status(500).json({
+    console.error('[Legacy Finalize Error]', err);
+    const status = err.status || 500;
+    return res.status(status).json({
       success: false,
-      error: { code: 'FINALIZATION_FAILED', message: err.message }
+      error: { code: err.code || 'FINALIZATION_FAILED', message: err.message }
     });
   }
 });
 
 // -------------------------------------------------------------
-// POST /api/upload (Single multipart file upload)
+// POST /api/upload (@deprecated Legacy Single File Upload)
+// Delegates to canonical UploadService
 // -------------------------------------------------------------
 router.post('/upload', optionalAuth, upload.single('pdf'), async (req, res) => {
   const startTime = Date.now();
@@ -242,97 +158,77 @@ router.post('/upload', optionalAuth, upload.single('pdf'), async (req, res) => {
       });
     }
 
-    const fileBuffer = req.file.buffer;
+    const targetUserId = req.user ? req.user.id : db.SYSTEM_ADMIN_ID;
     const rawFilename = (req.file.originalname || 'document.pdf').replace(/[^a-zA-Z0-9._-]/g, '_');
     const pubTitle = req.body.title ? req.body.title.trim() : rawFilename.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ').trim();
     const pubCategory = req.body.category || 'Magazine';
     const pubDescription = req.body.description || '';
     const pubAuthor = req.body.author || '';
-    const targetUserId = req.user ? req.user.id : db.SYSTEM_ADMIN_ID;
+    const visibility = req.body.visibility || 'PUBLIC';
 
-    const user = db.getUserById(targetUserId);
-    const plan = getUserPlan(user);
-
-    // Validate PDF
-    const pdfMeta = await pdfService.validateAndInspect(fileBuffer);
-
-    // Duplicate check
-    const existing = db.getPublicationByHash(pdfMeta.fileHash, targetUserId);
-    if (existing) {
-      return res.status(200).json({
-        success: true,
-        data: {
-          duplicate: true,
-          publicationId: existing.id,
-          id: existing.id,
-          user_id: existing.user_id || targetUserId,
-          title: existing.title,
-          pageCount: existing.page_count,
-          pdfUrl: existing.pdf_url,
-          coverUrl: existing.cover_url,
-          postUrl: existing.blogger_post_url || `https://${config.blogger.blogDomain}/#doc=${existing.id}`,
-          status: existing.status
-        }
-      });
-    }
-
-    const pubId = generatePubId();
-    const datePrefix = new Date().toISOString().slice(0, 7).replace('-', '/');
-    const storageKey = `uploads/${datePrefix}/${pubId}/${rawFilename}`;
-
-    const { url: pdfUrl } = await storageService.upload(storageKey, fileBuffer, 'application/pdf');
-
-    const coverSvg = pdfService.generateVectorCoverSvg(pubTitle, pubCategory, pdfMeta.pageCount);
-    const coverKey = `covers/${pubId}.svg`;
-    const { url: coverUrl } = await storageService.upload(coverKey, coverSvg, 'image/svg+xml');
-
-    const pubRecord = db.createPublication({
-      id: pubId,
-      user_id: targetUserId,
+    // 1. Initialize canonical session
+    const initRes = await uploadService.initUpload({
+      userId: targetUserId,
+      filename: rawFilename,
+      fileSize: req.file.buffer.length,
+      totalChunks: 1,
       title: pubTitle,
       category: pubCategory,
       description: pubDescription,
       author: pubAuthor,
-      pdf_filename: rawFilename,
-      storage_key: storageKey,
-      pdf_url: pdfUrl,
-      cover_url: coverUrl,
-      page_count: pdfMeta.pageCount,
-      file_size: pdfMeta.fileSize,
-      file_hash: pdfMeta.fileHash,
-      status: 'READY',
-      published: 1,
-      has_branding: plan.has_branding ? 1 : 0
+      visibility
     });
 
-    console.log(`[Single Upload] Publication ${pubId} saved to R2 & DB (User: ${targetUserId}) in ${Date.now() - startTime}ms`);
+    // 2. Stream single chunk
+    await uploadService.saveChunk({
+      userId: targetUserId,
+      uploadId: initRes.uploadId,
+      chunkIndex: 0,
+      buffer: req.file.buffer
+    });
+
+    // 3. Complete upload through canonical pipeline
+    const completionRes = await uploadService.completeUpload({
+      userId: targetUserId,
+      uploadId: initRes.uploadId,
+      title: pubTitle,
+      category: pubCategory,
+      description: pubDescription,
+      author: pubAuthor,
+      coverBase64: req.body.coverBase64,
+      visibility
+    });
+
+    const pub = completionRes.publication;
+    const fullPub = db.getPublicationById(pub.id);
 
     return res.status(200).json({
       success: true,
       data: {
-        publicationId: pubId,
-        id: pubId,
+        publicationId: pub.id,
+        id: pub.id,
         user_id: targetUserId,
-        title: pubTitle,
-        category: pubCategory,
-        pageCount: pdfMeta.pageCount,
-        fileSize: pdfMeta.fileSize,
-        pdfUrl,
-        pdf_url: pdfUrl,
-        coverUrl,
-        cover_url: coverUrl,
-        postUrl: `https://${config.blogger.blogDomain}/#doc=${pubId}`,
-        status: 'READY',
-        has_branding: pubRecord.has_branding,
+        title: pub.title,
+        category: pub.category,
+        pageCount: pub.pageCount,
+        fileSize: pub.fileSize,
+        pdfUrl: pub.pdfUrl,
+        pdf_url: pub.pdfUrl,
+        coverUrl: pub.coverUrl,
+        cover_url: pub.coverUrl,
+        postUrl: fullPub && fullPub.blogger_post_url ? fullPub.blogger_post_url : `https://${config.blogger.blogDomain}/#doc=${pub.id}`,
+        status: pub.status,
+        has_branding: pub.hasBranding,
         timeElapsedMs: Date.now() - startTime
       }
     });
 
   } catch (err) {
-    console.error('[Single Upload Error]', err);
-    return res.status(500).json({
+    console.error('[Legacy Single Upload Error]', err);
+    const status = err.status || 500;
+    return res.status(status).json({
       success: false,
-      error: { code: 'UPLOAD_FAILED', message: err.message }
+      error: { code: err.code || 'UPLOAD_FAILED', message: err.message }
     });
   }
 });
@@ -348,6 +244,39 @@ router.get('/', optionalAuth, (req, res) => {
 
     const result = db.listPublications({
       userId: isUserAuth ? req.user.id : null,
+      isAdmin,
+      category,
+      search,
+      page: parseInt(page, 10) || 1,
+      limit: parseInt(limit, 10) || 50,
+      status,
+      visibility
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result.publications,
+      pagination: result.pagination
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'LIST_FAILED', message: err.message }
+    });
+  }
+});
+
+// -------------------------------------------------------------
+// -------------------------------------------------------------
+// GET /api/publications/mine (Authenticated User's Management List)
+// -------------------------------------------------------------
+router.get('/mine', requireAuth, (req, res) => {
+  try {
+    const { category, search, page, limit, status, visibility } = req.query;
+    const isAdmin = req.user && req.user.role === 'ADMIN';
+
+    const result = db.listPublications({
+      userId: req.user.id,
       isAdmin,
       category,
       search,
@@ -391,7 +320,7 @@ router.get('/categories', (req, res) => {
 // -------------------------------------------------------------
 // GET /api/publications/:id (Public / Viewer & Editor Metadata)
 // -------------------------------------------------------------
-router.get('/:id', (req, res) => {
+router.get('/:id', optionalAuth, (req, res) => {
   try {
     const { id } = req.params;
     const publication = db.getPublicationById(id);
@@ -403,8 +332,18 @@ router.get('/:id', (req, res) => {
       });
     }
 
+    // Enforce private visibility check
+    const isOwner = req.user && publication.user_id === req.user.id;
+    const isAdmin = req.user && req.user.role === 'ADMIN';
+    if (publication.visibility === 'PRIVATE' && !isOwner && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'This publication is private.' }
+      });
+    }
+
     // Do not leak password_hash in response
-    const { password_hash, ...safePublication } = publication;
+    const { password_hash, storage_key, ...safePublication } = publication;
 
     return res.status(200).json({
       success: true,
@@ -421,13 +360,33 @@ router.get('/:id', (req, res) => {
 // -------------------------------------------------------------
 // GET /api/publications/:id/pdf (Direct CORS-Enabled Stream)
 // -------------------------------------------------------------
-router.get('/:id/pdf', async (req, res) => {
+router.get('/:id/pdf', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const publication = db.getPublicationById(id);
 
     if (!publication) {
       return res.status(404).send('Publication not found');
+    }
+
+    // Enforce Private Visibility
+    const isOwner = req.user && publication.user_id === req.user.id;
+    const isAdmin = req.user && req.user.role === 'ADMIN';
+    if (publication.visibility === 'PRIVATE' && !isOwner && !isAdmin) {
+      return res.status(403).send('This publication is private.');
+    }
+
+    // Enforce Password Protection
+    if (publication.visibility === 'PASSWORD_PROTECTED' && !isOwner && !isAdmin) {
+      let token = req.query.token;
+      if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+        token = req.headers.authorization.substring(7);
+      }
+
+      const isAuthorized = authService.verifyViewerToken(token, id);
+      if (!isAuthorized) {
+        return res.status(401).send('Viewer authorization token required for password protected publication.');
+      }
     }
 
     res.setHeader('Access-Control-Allow-Origin', '*');

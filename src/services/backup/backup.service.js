@@ -212,17 +212,42 @@ class BackupService {
   }
 
   /**
-   * Restore database from backup data
+   * Restore database from backup data safely with pre-restore snapshot and audit logging
    */
-  restoreFromData(backupPayload) {
-    if (!backupPayload || !backupPayload.data) {
-      throw new Error('Invalid backup file structure: missing data node.');
+  async restoreFromData(backupPayload, adminUserId = 'ADMIN') {
+    if (!backupPayload || typeof backupPayload !== 'object') {
+      throw new Error('Invalid backup file structure: payload must be a valid JSON object.');
     }
 
-    if (db.restoreRawStores) {
-      return db.restoreRawStores(backupPayload.data);
-    } else {
-      throw new Error('Database does not support restore operation.');
+    const rawData = backupPayload.data || backupPayload;
+    if (!rawData || (!Array.isArray(rawData.users) && !Array.isArray(rawData.publications))) {
+      throw new Error('Schema validation failed: backup snapshot must contain valid users or publications records.');
+    }
+
+    // 1. Create automated pre-restore safety snapshot before touching active database
+    console.log(`[BackupService] 🔒 Creating automated PRE_RESTORE_SAFETY backup prior to admin restore...`);
+    const safetyBackup = await this.createBackup('PRE_RESTORE_SAFETY');
+
+    // 2. Perform transactional database restore
+    try {
+      if (!db.restoreRawStores) {
+        throw new Error('Database does not support restore operation.');
+      }
+
+      const result = db.restoreRawStores(rawData);
+
+      console.log(`[BackupService] ✅ Database restored successfully by admin: ${adminUserId}. Safety snapshot: ${safetyBackup.filename}`);
+
+      return {
+        success: true,
+        restored_by: adminUserId,
+        restored_at: new Date().toISOString(),
+        safety_backup: safetyBackup.filename,
+        counts: result.restored_counts || result
+      };
+    } catch (err) {
+      console.error(`[BackupService] ❌ Database restore failed for admin ${adminUserId}:`, err.message);
+      throw err;
     }
   }
 

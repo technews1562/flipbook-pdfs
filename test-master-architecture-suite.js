@@ -477,8 +477,8 @@ async function runMasterSuite() {
   });
 
 
-  // --- SECTION 6: ANALYTICS TELEMETRY ---
-  console.log('\n--- 6. Analytics Telemetry ---');
+  // --- SECTION 6: ANALYTICS TELEMETRY & PLAN ENFORCEMENT ---
+  console.log('\n--- 6. Analytics Telemetry & Plan Enforcement ---');
 
   await test('POST /api/analytics/event records VIEW event and increments view_count', async () => {
     const res = await requestJson('POST', '/api/analytics/event', {
@@ -502,19 +502,170 @@ async function runMasterSuite() {
     assert.strictEqual(res.data.data.recorded, true);
   });
 
-  // --- SECTION 7: BLOGGER COMPATIBILITY ---
-  console.log('\n--- 7. Blogger Compatibility Endpoints ---');
+  await test('Free user requesting GET /api/analytics/:id is blocked (403 PLAN_UPGRADE_REQUIRED)', async () => {
+    // User B is on 'free' plan
+    // Create a publication for User B
+    const bPub = db.createPublication({
+      id: `pub_test_b_${Date.now().toString(36)}`,
+      user_id: userBId,
+      title: 'User B Document',
+      storage_key: 'uploads/test/b.pdf',
+      pdf_url: '/api/public/b/pdf',
+      page_count: 1,
+      file_size: 1024,
+      status: 'READY',
+      published: 1,
+      visibility: 'PUBLIC'
+    });
 
-  await test('GET /api/publications (Public Feed) works for Blogger catalog', async () => {
+    const res = await requestJson('GET', `/api/analytics/${bPub.id}`, null, {
+      'Authorization': `Bearer ${userBToken}`
+    });
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(res.data.success, false);
+    assert.strictEqual(res.data.error.code, 'PLAN_UPGRADE_REQUIRED');
+
+    db.deletePublication(bPub.id);
+  });
+
+  await test('Pro user (User A) requesting GET /api/analytics/:id succeeds (200 OK)', async () => {
+    const res = await requestJson('GET', `/api/analytics/${publicationId}`, null, {
+      'Authorization': `Bearer ${userAToken}`
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.success, true);
+    assert.strictEqual(res.data.data.publicationId, publicationId);
+    assert.ok(res.data.data.totalEvents >= 1);
+    assert.ok(res.data.data.eventTypes);
+  });
+
+  await test('User B cannot access User A analytics (403 FORBIDDEN)', async () => {
+    const res = await requestJson('GET', `/api/analytics/${publicationId}`, null, {
+      'Authorization': `Bearer ${userBToken}`
+    });
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(res.data.success, false);
+    assert.strictEqual(res.data.error.code, 'FORBIDDEN');
+  });
+
+  // --- SECTION 7: GUEST CATALOG ISOLATION & BLOGGER COMPATIBILITY ---
+  console.log('\n--- 7. Guest Catalog Isolation & Blogger Compatibility ---');
+
+  await test('Guest GET /api/publications returns ONLY public published flipbooks', async () => {
     const res = await requestJson('GET', '/api/publications');
     assert.strictEqual(res.status, 200);
     assert.ok(Array.isArray(res.data.data));
+
+    // Secret document (PASSWORD_PROTECTED) must NOT be in guest catalog
+    assert.ok(!res.data.data.some(p => p.id === protectedPubId));
+    // Must never leak password_hash or storage_key
+    assert.ok(res.data.data.every(p => p.password_hash === undefined && p.storage_key === undefined));
   });
 
-  await test('GET /api/publications/:id works for Blogger viewer', async () => {
-    const res = await requestJson('GET', `/api/publications/${publicationId}`);
+  await test('GET /api/publications/mine requires authentication', async () => {
+    const res = await requestJson('GET', '/api/publications/mine');
+    assert.strictEqual(res.status, 401);
+  });
+
+  await test('GET /api/publications/mine returns user owned publications', async () => {
+    const res = await requestJson('GET', '/api/publications/mine', null, {
+      'Authorization': `Bearer ${userAToken}`
+    });
     assert.strictEqual(res.status, 200);
-    assert.strictEqual(res.data.data.id, publicationId);
+    assert.ok(Array.isArray(res.data.data));
+    assert.ok(res.data.data.some(p => p.id === publicationId));
+  });
+
+  // --- SECTION 8: ADMIN BACKUP & HARDENED RESTORE ---
+  console.log('\n--- 8. Admin Hardened Backup & Restore Safety ---');
+  const adminApiKey = process.env.ADMIN_API_KEY || 'test_master_admin_key_2026';
+
+  await test('Non-admin user blocked from POST /api/admin/db/restore (403 Forbidden)', async () => {
+    const res = await requestJson('POST', '/api/admin/db/restore', { test: true }, {
+      'Authorization': `Bearer ${userAToken}`
+    });
+    assert.strictEqual(res.status, 403);
+  });
+
+  await test('Admin POST /api/admin/db/restore with invalid structure is rejected (400/500)', async () => {
+    const res = await requestJson('POST', '/api/admin/db/restore', { invalid: 'payload' }, {
+      'x-admin-key': adminApiKey
+    });
+    assert.strictEqual(res.status, 500);
+    assert.strictEqual(res.data.success, false);
+  });
+
+  await test('Admin POST /api/admin/db/restore creates pre-restore safety backup and restores', async () => {
+    const currentUsers = db.getAllUsers();
+    const currentPubs = db.listPublications({ isAdmin: true }).publications;
+
+    const restorePayload = {
+      version: '1.0.0',
+      data: {
+        users: currentUsers,
+        publications: currentPubs,
+        plans: db.listPlans()
+      }
+    };
+
+    const res = await requestJson('POST', '/api/admin/db/restore', restorePayload, {
+      'x-admin-key': adminApiKey
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.success, true);
+    assert.ok(res.data.data.safety_backup);
+  });
+
+  // --- SECTION 9: LEGACY UPLOAD ENDPOINT DELEGATION ---
+  console.log('\n--- 9. Legacy Upload Endpoints Delegation ---');
+
+  await test('Legacy POST /api/upload single file upload delegates to canonical UploadService', async () => {
+    const boundary = '----UploadLegacyBoundary' + Math.random().toString(36).substring(2);
+    let header = '';
+    header += '--' + boundary + '\r\n';
+    header += 'Content-Disposition: form-data; name="title"\r\n\r\nLegacy Delegate Doc\r\n';
+    header += '--' + boundary + '\r\n';
+    header += 'Content-Disposition: form-data; name="category"\r\n\r\nMagazine\r\n';
+    header += '--' + boundary + '\r\n';
+    header += 'Content-Disposition: form-data; name="pdf"; filename="legacy.pdf"\r\n';
+    header += 'Content-Type: application/pdf\r\n\r\n';
+
+    const bodyStart = Buffer.from(header, 'utf8');
+    const bodyEnd = Buffer.from('\r\n--' + boundary + '--\r\n', 'utf8');
+    const fullBody = Buffer.concat([bodyStart, VALID_PDF_BUFFER, bodyEnd]);
+
+    const res = await new Promise((resolve, reject) => {
+      const req = http.request({
+        hostname: 'localhost',
+        port: 8099,
+        path: '/api/upload',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'multipart/form-data; boundary=' + boundary,
+          'Content-Length': fullBody.length,
+          'Authorization': `Bearer ${userAToken}`
+        }
+      }, (r) => {
+        let data = '';
+        r.on('data', c => data += c);
+        r.on('end', () => {
+          let json = null;
+          try { json = JSON.parse(data); } catch (e) { json = data; }
+          resolve({ status: r.statusCode, data: json });
+        });
+      });
+      req.on('error', reject);
+      req.write(fullBody);
+      req.end();
+    });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.success, true);
+    assert.strictEqual(res.data.data.status, 'READY');
+    assert.ok(res.data.data.publicationId);
+
+    // Clean up legacy upload
+    db.deletePublication(res.data.data.publicationId);
   });
 
   // --- CLEANUP ---
@@ -545,3 +696,4 @@ setTimeout(() => {
     process.exit(1);
   });
 }, 800);
+
