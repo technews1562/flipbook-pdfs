@@ -403,7 +403,7 @@
                 <strong>Master Admin Account</strong>
                 <div class="text-muted">Primary administrator email</div>
               </div>
-              <code>technews1562@gmail.com</code>
+              <code id="settingsAdminEmail">technews1562@gmail.com</code>
             </div>
             <div class="setting-item">
               <div>
@@ -426,6 +426,84 @@
               </div>
               <span class="badge badge-success">Enabled</span>
             </div>
+          </div>
+        </div>
+
+        <!-- Subscription Plans & Microsoft Store Pricing Matrix -->
+        <div class="card" style="margin-top:20px;">
+          <div class="card-head">
+            <div>
+              <h3>💳 Subscription Plans &amp; Microsoft Store Products</h3>
+              <p class="subtitle" style="margin-top:4px;">Official pricing tiers, Microsoft Store Add-On Product IDs, quotas, and capability matrix.</p>
+            </div>
+            <span class="badge badge-primary">Auto-Sync Enabled</span>
+          </div>
+
+          <div class="table-container" style="margin-top:16px;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Plan Tier</th>
+                  <th>Store Product ID</th>
+                  <th>Duration / Cycle</th>
+                  <th>Retail Price</th>
+                  <th>Max Pubs</th>
+                  <th>Storage Quota</th>
+                  <th>Max PDF Size</th>
+                  <th>Max Pages</th>
+                  <th>Features &amp; Branding</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="badge" style="background:rgba(148,163,184,0.15); color:#94a3b8; font-weight:700;">FREE</span></td>
+                  <td><code>default_free</code></td>
+                  <td>Permanent</td>
+                  <td><strong style="color:var(--text-main);">$0.00</strong></td>
+                  <td>5 pubs</td>
+                  <td>100 MB</td>
+                  <td>25 MB</td>
+                  <td>30 pages</td>
+                  <td><span class="badge badge-warning">FlipView Watermark</span></td>
+                </tr>
+                <tr>
+                  <td rowspan="2" style="vertical-align:middle;"><span class="badge badge-primary" style="font-weight:700;">PRO</span></td>
+                  <td><code>flipview_pro_monthly</code></td>
+                  <td>Monthly (1 Mo)</td>
+                  <td><strong style="color:var(--primary);">$9.00 / mo</strong></td>
+                  <td rowspan="2" style="vertical-align:middle;">250 pubs</td>
+                  <td rowspan="2" style="vertical-align:middle;">10 GB</td>
+                  <td rowspan="2" style="vertical-align:middle;">200 MB</td>
+                  <td rowspan="2" style="vertical-align:middle;">1,000 pages</td>
+                  <td rowspan="2" style="vertical-align:middle;"><span class="badge badge-success">No Watermark</span> • Password Protect • Analytics</td>
+                </tr>
+                <tr>
+                  <td><code>flipview_pro_annual</code></td>
+                  <td>Annual (1 Year)</td>
+                  <td><strong style="color:var(--primary);">$79.00 / yr</strong> <span class="text-muted" style="font-size:0.75rem;">($6.58/mo, Save 27%)</span></td>
+                </tr>
+                <tr>
+                  <td rowspan="2" style="vertical-align:middle;"><span class="badge badge-warning" style="font-weight:700;">BUSINESS</span></td>
+                  <td><code>flipview_business_monthly</code></td>
+                  <td>Monthly (1 Mo)</td>
+                  <td><strong style="color:var(--accent);">$19.00 / mo</strong></td>
+                  <td rowspan="2" style="vertical-align:middle;">1,000 pubs</td>
+                  <td rowspan="2" style="vertical-align:middle;">50 GB</td>
+                  <td rowspan="2" style="vertical-align:middle;">500 MB</td>
+                  <td rowspan="2" style="vertical-align:middle;">2,500 pages</td>
+                  <td rowspan="2" style="vertical-align:middle;"><span class="badge badge-success">Commercial License</span> • Priority CDN • Custom Branding</td>
+                </tr>
+                <tr>
+                  <td><code>flipview_business_annual</code></td>
+                  <td>Annual (1 Year)</td>
+                  <td><strong style="color:var(--accent);">$189.00 / yr</strong> <span class="text-muted" style="font-size:0.75rem;">($15.75/mo, Save 17%)</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="margin-top:16px; padding:14px 18px; background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.18); border-radius:var(--radius-md); font-size:0.85rem; color:var(--text-muted); line-height:1.5;">
+            💡 <strong>How In-App Purchases Sync to Admin Panel:</strong> When a user purchases or restores any subscription in the Windows App, the app calls <code>POST /api/auth/sync-subscription</code> with their Microsoft Store license token. The backend instantly upgrades their account in the database and updates their live plan badge, storage quota, and publication limits in real-time on this Admin Panel.
           </div>
         </div>
       </section>
