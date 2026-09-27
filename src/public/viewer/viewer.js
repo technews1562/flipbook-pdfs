@@ -93,7 +93,7 @@
     el.errorTitle = document.getElementById('fvErrorTitle');
     el.errorDesc = document.getElementById('fvErrorDesc');
     el.errorIcon = document.getElementById('fvErrorIcon');
-    el.passwordPrompt = document.getElementById('fvPasswordPrompt');
+    el.passwordPrompt = document.getElementById('fvPasswordPrompt') || document.getElementById('fvPasswordOverlay');
     el.passwordInput = document.getElementById('fvPasswordInput');
     el.passwordBtn = document.getElementById('fvPasswordBtn');
     el.passwordError = document.getElementById('fvPasswordError');
