@@ -115,43 +115,162 @@ function loadJsonStore() {
   }
 }
 
+let r2SyncTimer = null;
+
 async function syncToCloudflareR2() {
   const ss = getStorageService();
-  if (ss && ss.isR2Configured) {
-    try {
-      const buffer = Buffer.from(JSON.stringify(memoryStore, null, 2), 'utf8');
-      await ss.upload('catalog/publications.json', buffer, 'application/json');
-    } catch (e) {
-      console.warn('[DB] Failed to sync catalog to Cloudflare R2:', e.message);
+  if (!ss || !ss.isR2Configured) return;
+
+  try {
+    // 1. Sync publications catalog
+    const pubBuffer = Buffer.from(JSON.stringify(memoryStore, null, 2), 'utf8');
+    await ss.upload('catalog/publications.json', pubBuffer, 'application/json');
+
+    // 2. Sync users catalog (preserves all registered users across deployments)
+    const usersBuffer = Buffer.from(JSON.stringify(usersStore, null, 2), 'utf8');
+    await ss.upload('catalog/users.json', usersBuffer, 'application/json');
+
+    // 3. Sync sessions (keeps active user logins alive across deployments)
+    if (sessionsStore.length > 0) {
+      const sessBuffer = Buffer.from(JSON.stringify(sessionsStore, null, 2), 'utf8');
+      await ss.upload('catalog/sessions.json', sessBuffer, 'application/json');
     }
+
+    // 4. Sync analytics events
+    if (analyticsEventsStore.length > 0) {
+      const analyticsBuffer = Buffer.from(JSON.stringify(analyticsEventsStore, null, 2), 'utf8');
+      await ss.upload('catalog/analytics.json', analyticsBuffer, 'application/json');
+    }
+
+    // 5. Sync plans
+    if (plansStore.length > 0) {
+      const plansBuffer = Buffer.from(JSON.stringify(plansStore, null, 2), 'utf8');
+      await ss.upload('catalog/plans.json', plansBuffer, 'application/json');
+    }
+  } catch (e) {
+    console.warn('[DB] Failed to sync data stores to Cloudflare R2:', e.message);
   }
 }
 
 async function syncFromCloudflareR2() {
   const ss = getStorageService();
-  if (ss && ss.isR2Configured) {
+  if (!ss || !ss.isR2Configured) return;
+
+  try {
+    // 1. Restore Users from Cloudflare R2
     try {
-      const buf = await ss.getBuffer('catalog/publications.json');
-      if (buf) {
-        const loaded = JSON.parse(buf.toString('utf8'));
-        if (Array.isArray(loaded) && loaded.length > 0) {
-          loaded.forEach(item => {
+      const usersBuf = await ss.getBuffer('catalog/users.json');
+      if (usersBuf) {
+        const loadedUsers = JSON.parse(usersBuf.toString('utf8'));
+        if (Array.isArray(loadedUsers) && loadedUsers.length > 0) {
+          loadedUsers.forEach(u => {
+            if (!u.id || !u.email) return;
+            const existingIdx = usersStore.findIndex(item => item.id === u.id || (item.email && item.email.toLowerCase() === u.email.toLowerCase()));
+            if (existingIdx === -1) {
+              usersStore.push(u);
+            } else {
+              // Preserve existing user properties unless it's master admin being upgraded
+              if (u.id !== SYSTEM_ADMIN_ID && u.email !== 'technews1562@gmail.com') {
+                usersStore[existingIdx] = { ...u, ...usersStore[existingIdx] };
+              }
+            }
+
+            if (sqliteDb) {
+              try {
+                sqliteDb.prepare(`
+                  INSERT OR REPLACE INTO users (
+                    id, email, password_hash, full_name, avatar_url, role,
+                    plan_id, storage_used_bytes, publication_count, created_at, updated_at
+                  ) VALUES (
+                    @id, @email, @password_hash, @full_name, @avatar_url, @role,
+                    @plan_id, @storage_used_bytes, @publication_count, @created_at, @updated_at
+                  )
+                `).run(u);
+              } catch (e) {}
+            }
+          });
+          console.log(`[DB] Successfully restored ${loadedUsers.length} user accounts from Cloudflare R2.`);
+        }
+      }
+    } catch (e) {}
+
+    // 2. Restore Publications from Cloudflare R2
+    try {
+      const pubBuf = await ss.getBuffer('catalog/publications.json');
+      if (pubBuf) {
+        const loadedPubs = JSON.parse(pubBuf.toString('utf8'));
+        if (Array.isArray(loadedPubs) && loadedPubs.length > 0) {
+          loadedPubs.forEach(item => {
             if (!item.user_id) item.user_id = SYSTEM_ADMIN_ID;
             if (!item.visibility) item.visibility = 'PUBLIC';
             const existingIdx = memoryStore.findIndex(p => p.id === item.id);
             if (existingIdx === -1) {
               memoryStore.push(item);
             }
+            if (sqliteDb) {
+              try {
+                sqliteDb.prepare(`
+                  INSERT OR IGNORE INTO publications (
+                    id, user_id, title, slug, category, description, author,
+                    pdf_filename, storage_key, pdf_url, cover_url,
+                    page_count, file_size, file_hash, status, published, visibility,
+                    password_hash, has_branding, download_enabled, share_enabled,
+                    view_count, blogger_post_id, blogger_post_url, published_at,
+                    created_at, updated_at
+                  ) VALUES (
+                    @id, @user_id, @title, @slug, @category, @description, @author,
+                    @pdf_filename, @storage_key, @pdf_url, @cover_url,
+                    @page_count, @file_size, @file_hash, @status, @published, @visibility,
+                    @password_hash, @has_branding, @download_enabled, @share_enabled,
+                    @view_count, @blogger_post_id, @blogger_post_url, @published_at,
+                    @created_at, @updated_at
+                  )
+                `).run(item);
+              } catch (e) {}
+            }
           });
-          saveJsonStore();
-          console.log(`[DB] Successfully synchronized publications from Cloudflare R2 catalog.`);
+          console.log(`[DB] Successfully synchronized ${loadedPubs.length} publications from Cloudflare R2 catalog.`);
         }
       }
     } catch (e) {}
+
+    // 3. Restore Sessions from Cloudflare R2
+    try {
+      const sessBuf = await ss.getBuffer('catalog/sessions.json');
+      if (sessBuf) {
+        const loadedSess = JSON.parse(sessBuf.toString('utf8'));
+        if (Array.isArray(loadedSess)) {
+          loadedSess.forEach(s => {
+            if (!sessionsStore.find(item => item.id === s.id)) {
+              sessionsStore.push(s);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+
+    // 4. Restore Analytics from Cloudflare R2
+    try {
+      const analyticsBuf = await ss.getBuffer('catalog/analytics.json');
+      if (analyticsBuf) {
+        const loadedAnalytics = JSON.parse(analyticsBuf.toString('utf8'));
+        if (Array.isArray(loadedAnalytics)) {
+          loadedAnalytics.forEach(a => {
+            if (!analyticsEventsStore.find(item => item.id === a.id)) {
+              analyticsEventsStore.push(a);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+
+    saveJsonStoreLocal();
+  } catch (err) {
+    console.warn('[DB] Error during Cloudflare R2 data restore:', err.message);
   }
 }
 
-function saveJsonStore() {
+function saveJsonStoreLocal() {
   try {
     fs.writeFileSync(jsonDbPath, JSON.stringify(memoryStore, null, 2), 'utf8');
     fs.writeFileSync(jsonUsersPath, JSON.stringify(usersStore, null, 2), 'utf8');
@@ -163,11 +282,18 @@ function saveJsonStore() {
   } catch (e) {
     console.warn('[DB] Failed to persist JSON stores:', e.message);
   }
-  syncToCloudflareR2().catch(() => {});
+}
+
+function saveJsonStore() {
+  saveJsonStoreLocal();
+  if (r2SyncTimer) clearTimeout(r2SyncTimer);
+  r2SyncTimer = setTimeout(() => {
+    syncToCloudflareR2().catch(() => {});
+  }, 400);
 }
 
 loadJsonStore();
-setTimeout(syncFromCloudflareR2, 1200);
+setTimeout(syncFromCloudflareR2, 1000);
 
 // -------------------------------------------------------------
 // SQLITE INITIALIZATION & MIGRATIONS
