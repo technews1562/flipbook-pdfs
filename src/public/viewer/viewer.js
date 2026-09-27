@@ -934,13 +934,27 @@
   function setupInteractiveListeners() {
     const viewport = el.viewport || window;
 
-    // Ctrl + Mouse Wheel (or Trackpad Pinch) Zoom
+    // Ctrl + Mouse Wheel (or Trackpad Pinch) Zoom & Natural Wheel Page Turning
     viewport.addEventListener('wheel', (e) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         const zoomDelta = -e.deltaY * 0.0035;
         const targetZoom = Math.max(1.0, Math.min(3.5, currentZoom + zoomDelta));
         applyZoom(targetZoom, e.clientX, e.clientY);
+      } else if (currentZoom <= 1.05 && currentActivePageFlip) {
+        // Natural wheel navigation with debounce
+        const now = Date.now();
+        if (now - lastPageTurnTime > 500) {
+          if (e.deltaY > 35 || e.deltaX > 35) {
+            e.preventDefault();
+            lastPageTurnTime = now;
+            currentActivePageFlip.flipNext();
+          } else if (e.deltaY < -35 || e.deltaX < -35) {
+            e.preventDefault();
+            lastPageTurnTime = now;
+            currentActivePageFlip.flipPrev();
+          }
+        }
       }
     }, { passive: false });
 

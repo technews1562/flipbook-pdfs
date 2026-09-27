@@ -330,7 +330,24 @@ class AuthService {
   /**
    * Sync Microsoft Store Subscription to user account
    */
-  async syncSubscription(userId, { planId = 'free', storeProductId = '', isActive = true }) {
+  async syncSubscription(userIdOrOptions, options = {}) {
+    let userId;
+    let planId = 'free';
+    let storeProductId = '';
+    let isActive = true;
+
+    if (typeof userIdOrOptions === 'object' && userIdOrOptions !== null) {
+      userId = userIdOrOptions.userId;
+      planId = userIdOrOptions.planId || userIdOrOptions.plan_id || 'free';
+      storeProductId = userIdOrOptions.storeProductId || userIdOrOptions.store_product_id || '';
+      isActive = userIdOrOptions.isActive !== false && userIdOrOptions.is_active !== false;
+    } else {
+      userId = userIdOrOptions;
+      planId = options.planId || options.plan_id || 'free';
+      storeProductId = options.storeProductId || options.store_product_id || '';
+      isActive = options.isActive !== false && options.is_active !== false;
+    }
+
     if (!userId) {
       throw new Error('User ID is required.');
     }
