@@ -564,7 +564,7 @@
         cachedPages.push({
           pageNumber: i,
           density: (i === 1 || i === numPages) ? 'hard' : 'soft',
-          canvas: canvas,
+          masterCanvas: canvas,
           width: viewport.width,
           height: viewport.height
         });
@@ -626,6 +626,9 @@
     if (!cachedPages || cachedPages.length === 0) return;
     const numPages = cachedPages.length;
 
+    // Preserve current page within bounds
+    const safeStartPage = Math.max(0, Math.min(numPages - 1, startPageIndex));
+
     if (currentActivePageFlip) {
       try { currentActivePageFlip.destroy(); } catch (e) {}
       currentActivePageFlip = null;
@@ -635,6 +638,7 @@
     if (!container) return;
     container.innerHTML = '';
 
+    // Create fresh DOM elements and canvas copies for StPageFlip to own
     cachedPages.forEach((p, idx) => {
       const pDiv = document.createElement('div');
       pDiv.className = 'st-page';
@@ -644,13 +648,20 @@
       } else {
         pDiv.classList.add('--left');
       }
-      pDiv.appendChild(p.canvas);
+
+      const freshCanvas = document.createElement('canvas');
+      freshCanvas.width = p.width;
+      freshCanvas.height = p.height;
+      const ctx = freshCanvas.getContext('2d');
+      ctx.drawImage(p.masterCanvas, 0, 0);
+
+      pDiv.appendChild(freshCanvas);
       container.appendChild(pDiv);
     });
 
-    const firstCanvas = cachedPages[0].canvas;
-    const canvasW = firstCanvas ? firstCanvas.width : 600;
-    const canvasH = firstCanvas ? firstCanvas.height : 850;
+    const firstMaster = cachedPages[0].masterCanvas;
+    const canvasW = firstMaster ? firstMaster.width : 600;
+    const canvasH = firstMaster ? firstMaster.height : 850;
     const pageRatio = canvasH / canvasW;
 
     const stageW = window.innerWidth;
@@ -812,7 +823,10 @@
       thumbCanvas.width = 140;
       thumbCanvas.height = 190;
       const ctx = thumbCanvas.getContext('2d');
-      ctx.drawImage(p.canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+      const srcCanvas = p.masterCanvas || p.canvas;
+      if (srcCanvas) {
+        ctx.drawImage(srcCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+      }
 
       wrap.appendChild(thumbCanvas);
 
@@ -905,11 +919,22 @@
 
   // --- Fullscreen Toggle ---
   function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
+    try {
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        const docEl = document.documentElement;
+        if (docEl.requestFullscreen) {
+          docEl.requestFullscreen().catch(() => {});
+        } else if (docEl.webkitRequestFullscreen) {
+          docEl.webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+      }
+    } catch (e) {}
   }
 
   // --- Search in Document (Text Extraction via PDF.js) ---
@@ -1395,17 +1420,24 @@
     // Setup Touch & Pointer Wheel Controls
     setupInteractiveListeners();
 
-    // Window Resize Handler with Debouncing
+    // Window Resize & Fullscreen Change Handler with Debouncing
     let resizeTimer = null;
-    window.addEventListener('resize', () => {
+    const onViewportResizeOrFullscreen = () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        if (currentActivePageFlip) {
+        if (currentActivePageFlip && cachedPages && cachedPages.length > 0) {
           const curPage = currentActivePageFlip.getCurrentPageIndex();
           buildFlipbookInstance(curPage);
         }
-      }, 200);
-    });
+      }, 150);
+    };
+
+    window.addEventListener('resize', onViewportResizeOrFullscreen);
+    window.addEventListener('orientationchange', onViewportResizeOrFullscreen);
+    document.addEventListener('fullscreenchange', onViewportResizeOrFullscreen);
+    document.addEventListener('webkitfullscreenchange', onViewportResizeOrFullscreen);
+    document.addEventListener('mozfullscreenchange', onViewportResizeOrFullscreen);
+    document.addEventListener('MSFullscreenChange', onViewportResizeOrFullscreen);
   }
 
   // --- Bootstrap on Page Load ---
