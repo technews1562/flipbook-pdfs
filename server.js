@@ -55,6 +55,11 @@ app.get('/view/:publicationId*', (req, res) => {
   res.sendFile(path.join(__dirname, 'src/public/viewer/index.html'));
 });
 
+// Privacy Policy & Terms of Service for Microsoft Store verification
+app.get(['/privacy', '/terms'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'src/public/privacy/index.html'));
+});
+
 // API Routes
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/uploads', uploadsRouter);
