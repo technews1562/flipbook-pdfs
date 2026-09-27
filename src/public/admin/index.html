@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FlipView Cloud Studio &amp; Admin Dashboard</title>
+  <title>FlipView Cloud Studio — Master Admin Control Center</title>
   <link rel="stylesheet" href="admin.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
     if (window.pdfjsLib) {
@@ -16,20 +16,69 @@
   </script>
 </head>
 <body>
-  <div class="app-layout">
+
+  <!-- Admin Login Overlay (Security Gate) -->
+  <div class="login-overlay" id="adminLoginOverlay">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="brand-logo-glow">📖</div>
+        <h2>FlipView Studio</h2>
+        <span class="brand-badge-pill">Master Admin Portal</span>
+      </div>
+      <p class="login-subtitle">Protected administrative control center. Please authenticate to continue.</p>
+
+      <form id="adminLoginForm" class="login-form">
+        <div class="form-group">
+          <label>Admin ID / Email</label>
+          <div class="input-icon-wrap">
+            <span class="input-icon">👤</span>
+            <input type="email" id="loginEmail" class="form-input" placeholder="technews1562@gmail.com" value="technews1562@gmail.com" required autocomplete="username" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Password</label>
+          <div class="input-icon-wrap">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="loginPassword" class="form-input" placeholder="Enter master password..." value="Admin@4916" required autocomplete="current-password" />
+            <button type="button" class="btn-toggle-pwd" id="togglePwdBtn" title="Show/Hide Password">👁️</button>
+          </div>
+        </div>
+
+        <div class="login-error" id="loginError" style="display:none;"></div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg" id="loginSubmitBtn">
+          <span>Sign In to Admin Panel</span>
+        </button>
+      </form>
+
+      <div class="login-footer">
+        <span>Protected by End-to-End JWT Auth &amp; Cloudflare R2 Storage</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Admin Application Layout -->
+  <div class="app-layout" id="appLayout" style="display:none;">
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-logo">📖</div>
         <div>
           <h2 class="brand-name">FlipView</h2>
-          <span class="brand-badge">Cloud Admin</span>
+          <span class="brand-badge">Master Admin</span>
         </div>
       </div>
 
       <nav class="nav-menu">
-        <button class="nav-item active" data-tab="publications">
-          <span class="nav-icon">📚</span> Publications
+        <button class="nav-item active" data-tab="overview">
+          <span class="nav-icon">📊</span> Overview &amp; Stats
+        </button>
+        <button class="nav-item" data-tab="users">
+          <span class="nav-icon">👥</span> Users Management
+        </button>
+        <button class="nav-item" data-tab="publications">
+          <span class="nav-icon">📚</span> Publications Library
         </button>
         <button class="nav-item" data-tab="upload">
           <span class="nav-icon">⬆️</span> Upload &amp; Publish
@@ -43,11 +92,17 @@
       </nav>
 
       <div class="sidebar-footer">
-        <div class="system-status">
-          <span class="status-dot online"></span>
-          <span>API: Online</span>
+        <div class="admin-user-pill">
+          <div class="admin-avatar">👑</div>
+          <div class="admin-meta">
+            <span class="admin-email" id="sidebarAdminEmail">technews1562@gmail.com</span>
+            <span class="admin-role">Super Admin</span>
+          </div>
         </div>
-        <div class="version">FlipView v2.0 • R2 + SQLite</div>
+        <button class="btn btn-secondary btn-sm btn-block" id="logoutBtn" style="margin-top:10px;">
+          🚪 Log Out
+        </button>
+        <div class="version">FlipView v4.0 • R2 + Pure JS DB</div>
       </div>
     </aside>
 
@@ -55,39 +110,172 @@
     <main class="main-content">
       <!-- Topbar -->
       <header class="topbar">
-        <div class="topbar-title" id="pageTitle">Publications Library</div>
+        <div class="topbar-left">
+          <h1 class="topbar-title" id="pageTitle">Overview &amp; Statistics</h1>
+          <span class="badge badge-success" id="serverStatusBadge">🟢 API: Online</span>
+        </div>
         <div class="topbar-actions">
           <button class="btn btn-secondary" id="refreshBtn">🔄 Refresh</button>
-          <button class="btn btn-primary" id="newPubBtn">+ New Publication</button>
+          <button class="btn btn-primary" id="topUploadBtn">+ New Publication</button>
+          <button class="btn btn-accent" id="topAddUserBtn">+ Add User</button>
         </div>
       </header>
 
-      <!-- Stats Bar -->
+      <!-- Stats Bar (Overview) -->
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="stat-label">Total Publications</div>
-          <div class="stat-value" id="statTotalPubs">0</div>
+          <div class="stat-icon">📚</div>
+          <div class="stat-info">
+            <div class="stat-label">Total Publications</div>
+            <div class="stat-value" id="statTotalPubs">0</div>
+            <div class="stat-sub" id="statPubSub">All users combined</div>
+          </div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Live on Blogger</div>
-          <div class="stat-value text-success" id="statPublished">0</div>
+          <div class="stat-icon">👥</div>
+          <div class="stat-info">
+            <div class="stat-label">Registered Users</div>
+            <div class="stat-value text-accent" id="statTotalUsers">0</div>
+            <div class="stat-sub" id="statUsersSub">Free, Pro, Business</div>
+          </div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Blogger Pending</div>
-          <div class="stat-value text-warning" id="statPending">0</div>
+          <div class="stat-icon">👁️</div>
+          <div class="stat-info">
+            <div class="stat-label">Total Views / Reads</div>
+            <div class="stat-value text-success" id="statTotalViews">0</div>
+            <div class="stat-sub">Across all publications</div>
+          </div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Total Storage</div>
-          <div class="stat-value" id="statStorage">0 MB</div>
+          <div class="stat-icon">📦</div>
+          <div class="stat-info">
+            <div class="stat-label">Cloudflare R2 Storage</div>
+            <div class="stat-value text-primary" id="statStorage">0 MB</div>
+            <div class="stat-sub">Optimized cloud storage</div>
+          </div>
         </div>
       </div>
 
-      <!-- Tab: Publications -->
-      <section class="tab-content active" id="tab-publications">
+      <!-- Tab 1: Overview & Analytics -->
+      <section class="tab-content active" id="tab-overview">
+        <div class="overview-grid">
+          <!-- Plan Breakdown Card -->
+          <div class="card">
+            <div class="card-head">
+              <h3>💎 Plan Distribution</h3>
+              <span class="badge badge-primary">Active Subscriptions</span>
+            </div>
+            <div class="plan-breakdown-list">
+              <div class="plan-bar-item">
+                <div class="plan-bar-header">
+                  <span>Free Tier (5 docs / 100MB)</span>
+                  <strong id="planCountFree">0 users</strong>
+                </div>
+                <div class="plan-bar-track"><div class="plan-bar-fill fill-free" id="planBarFree" style="width:0%;"></div></div>
+              </div>
+              <div class="plan-bar-item">
+                <div class="plan-bar-header">
+                  <span>Pro Tier (250 docs / 10GB)</span>
+                  <strong id="planCountPro">0 users</strong>
+                </div>
+                <div class="plan-bar-track"><div class="plan-bar-fill fill-pro" id="planBarPro" style="width:0%;"></div></div>
+              </div>
+              <div class="plan-bar-item">
+                <div class="plan-bar-header">
+                  <span>Business Tier (1,000 docs / 50GB)</span>
+                  <strong id="planCountBusiness">0 users</strong>
+                </div>
+                <div class="plan-bar-track"><div class="plan-bar-fill fill-business" id="planBarBusiness" style="width:0%;"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions & Diagnostics -->
+          <div class="card">
+            <div class="card-head">
+              <h3>⚡ Quick Admin Controls</h3>
+            </div>
+            <div class="quick-actions-grid">
+              <button class="quick-btn" onclick="switchTab('users');">
+                <span class="qb-icon">👥</span>
+                <span class="qb-title">Manage Users</span>
+                <span class="qb-desc">Upgrade plans, reset passwords, suspend accounts</span>
+              </button>
+              <button class="quick-btn" onclick="switchTab('publications');">
+                <span class="qb-icon">📚</span>
+                <span class="qb-title">All Flipbooks</span>
+                <span class="qb-desc">Inspect, set passwords, download or delete</span>
+              </button>
+              <button class="quick-btn" onclick="switchTab('upload');">
+                <span class="qb-icon">⬆️</span>
+                <span class="qb-title">Upload &amp; Publish</span>
+                <span class="qb-desc">Publish direct to R2 with instant flipbook link</span>
+              </button>
+              <button class="quick-btn" onclick="switchTab('settings');">
+                <span class="qb-icon">⚙️</span>
+                <span class="qb-title">System Settings</span>
+                <span class="qb-desc">API endpoints, keys &amp; cloud storage</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 2: Users Management -->
+      <section class="tab-content" id="tab-users">
         <div class="table-toolbar">
-          <input type="text" id="searchPubs" class="form-input search-input" placeholder="🔍 Search publications by title, category, author..." />
-          <select id="filterCategory" class="form-select">
+          <input type="text" id="searchUsers" class="form-input search-input" placeholder="🔍 Search users by name, email, plan, or status..." />
+          <select id="filterUserPlan" class="form-select" style="max-width:180px;">
+            <option value="all">All Plans</option>
+            <option value="free">Free Tier</option>
+            <option value="pro">Pro Tier</option>
+            <option value="business">Business Tier</option>
+          </select>
+          <select id="filterUserStatus" class="form-select" style="max-width:180px;">
+            <option value="all">All Statuses</option>
+            <option value="ACTIVE">Active Only</option>
+            <option value="SUSPENDED">Suspended Only</option>
+          </select>
+          <button class="btn btn-primary" id="addNewUserBtn">+ Add User</button>
+        </div>
+
+        <div class="table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>Plan Tier</th>
+                <th>Status</th>
+                <th>Publications</th>
+                <th>Storage Used</th>
+                <th>Joined</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody">
+              <tr>
+                <td colspan="8" class="text-center" style="padding:32px;">Loading users...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Tab 3: Publications Library -->
+      <section class="tab-content" id="tab-publications">
+        <div class="table-toolbar">
+          <input type="text" id="searchPubs" class="form-input search-input" placeholder="🔍 Search publications by title, ID, author, or publisher email..." />
+          <select id="filterCategory" class="form-select" style="max-width:180px;">
             <option value="all">All Categories</option>
+          </select>
+          <select id="filterVisibility" class="form-select" style="max-width:180px;">
+            <option value="all">All Visibility</option>
+            <option value="PUBLIC">Public</option>
+            <option value="PASSWORD_PROTECTED">Password Protected</option>
+            <option value="UNLISTED">Unlisted</option>
+            <option value="PRIVATE">Private</option>
           </select>
         </div>
 
@@ -97,27 +285,29 @@
               <tr>
                 <th>Cover</th>
                 <th>Title &amp; ID</th>
+                <th>Owner</th>
                 <th>Category</th>
                 <th>Pages</th>
-                <th>Status</th>
+                <th>Visibility</th>
+                <th>Views</th>
                 <th>Created</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="publicationsTableBody">
               <tr>
-                <td colspan="7" class="text-center">Loading publications...</td>
+                <td colspan="9" class="text-center" style="padding:32px;">Loading publications...</td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <!-- Tab: Upload -->
+      <!-- Tab 4: Upload & Publish -->
       <section class="tab-content" id="tab-upload">
         <div class="card upload-card">
           <h3>Publish Digital PDF Publication</h3>
-          <p class="subtitle">Upload a PDF document. It will be stored in Cloudflare R2, assigned a unique ID, and auto-published to your Blogger site.</p>
+          <p class="subtitle">Upload a PDF document. It will be stored in Cloudflare R2, assigned a unique ID, and auto-published to the public reader.</p>
 
           <div class="dropzone" id="adminDropzone">
             <input type="file" id="adminPdfInput" accept="application/pdf" style="display:none;" />
@@ -173,11 +363,11 @@
         </div>
       </section>
 
-      <!-- Tab: Migration -->
+      <!-- Tab 5: Migration -->
       <section class="tab-content" id="tab-migration">
         <div class="card">
           <h3>GitHub to Cloudflare R2 Migration Tool</h3>
-          <p class="subtitle">Enumerate all legacy PDFs from your GitHub repository (<code>technews1562/flipbook-pdfs</code>), transfer them securely to Cloudflare R2, extract metadata, generate cover previews, and save them in the SQLite database.</p>
+          <p class="subtitle">Enumerate all legacy PDFs from your GitHub repository (<code>technews1562/flipbook-pdfs</code>), transfer them securely to Cloudflare R2, extract metadata, generate cover previews, and save them in the database.</p>
 
           <div class="migration-panel">
             <div class="form-group">
@@ -201,7 +391,7 @@
         </div>
       </section>
 
-      <!-- Tab: Settings -->
+      <!-- Tab 6: Settings -->
       <section class="tab-content" id="tab-settings">
         <div class="card">
           <h3>System &amp; API Configuration</h3>
@@ -210,30 +400,211 @@
           <div class="settings-list">
             <div class="setting-item">
               <div>
-                <strong>Blogger Blog ID</strong>
+                <strong>Master Admin Account</strong>
+                <div class="text-muted">Primary administrator email</div>
+              </div>
+              <code>technews1562@gmail.com</code>
+            </div>
+            <div class="setting-item">
+              <div>
+                <strong>Storage Provider</strong>
+                <div class="text-muted">Cloudflare R2 Object Storage (flipview-pdfs)</div>
+              </div>
+              <span class="badge badge-success">Active • S3 API</span>
+            </div>
+            <div class="setting-item">
+              <div>
+                <strong>Blogger Integration</strong>
                 <div class="text-muted">Target Blogger site destination</div>
               </div>
               <code id="cfgBlogId">5830475951713053686</code>
             </div>
             <div class="setting-item">
               <div>
-                <strong>Storage Provider</strong>
-                <div class="text-muted">Cloudflare R2 Object Storage</div>
+                <strong>Security &amp; Encryption</strong>
+                <div class="text-muted">Bcrypt password hashing + JWT HS256 authentication</div>
               </div>
-              <span class="badge badge-success">Active</span>
-            </div>
-            <div class="setting-item">
-              <div>
-                <strong>Database Engine</strong>
-                <div class="text-muted">SQLite (WAL Mode)</div>
-              </div>
-              <span class="badge badge-success">Connected</span>
+              <span class="badge badge-success">Enabled</span>
             </div>
           </div>
         </div>
       </section>
     </main>
   </div>
+
+  <!-- Modal: User Edit / Plan Upgrade -->
+  <div class="admin-modal-overlay" id="editUserModal">
+    <div class="admin-modal">
+      <div class="admin-modal-header">
+        <h3 id="editUserModalTitle">Edit User Account</h3>
+        <button class="modal-close-btn" onclick="closeModals();">✕</button>
+      </div>
+      <form id="editUserForm">
+        <input type="hidden" id="editUserId" />
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="editUserEmail" class="form-input" readonly />
+        </div>
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="editUserName" class="form-input" placeholder="User Name" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Subscription Plan Tier</label>
+            <select id="editUserPlan" class="form-select">
+              <option value="free">Free (5 pubs / 100MB)</option>
+              <option value="pro">Pro (250 pubs / 10GB)</option>
+              <option value="business">Business (1,000 pubs / 50GB)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Account Role</label>
+            <select id="editUserRole" class="form-select">
+              <option value="USER">Standard User</option>
+              <option value="ADMIN">Administrator</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Account Status</label>
+          <select id="editUserStatus" class="form-select">
+            <option value="ACTIVE">Active (Unrestricted)</option>
+            <option value="SUSPENDED">Suspended (Blocked)</option>
+          </select>
+        </div>
+        <div class="form-actions" style="margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModals();">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Reset User Password -->
+  <div class="admin-modal-overlay" id="resetPwdModal">
+    <div class="admin-modal">
+      <div class="admin-modal-header">
+        <h3>Reset User Password</h3>
+        <button class="modal-close-btn" onclick="closeModals();">✕</button>
+      </div>
+      <p class="subtitle" style="margin-bottom:16px;">Set a new password for <strong id="resetPwdUserEmail" class="text-primary">-</strong>:</p>
+      <form id="resetPwdForm">
+        <input type="hidden" id="resetPwdUserId" />
+        <div class="form-group">
+          <label>New Password (min 6 characters)</label>
+          <input type="password" id="resetNewPwd" class="form-input" placeholder="Enter new password..." required minlength="6" />
+        </div>
+        <div class="form-actions" style="margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModals();">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add New User -->
+  <div class="admin-modal-overlay" id="addUserModal">
+    <div class="admin-modal">
+      <div class="admin-modal-header">
+        <h3>Create New User Account</h3>
+        <button class="modal-close-btn" onclick="closeModals();">✕</button>
+      </div>
+      <form id="addUserForm">
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="addEmail" class="form-input" placeholder="user@example.com" required />
+        </div>
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="addName" class="form-input" placeholder="e.g. John Doe" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="addPassword" class="form-input" placeholder="Enter password (min 6 chars)..." required minlength="6" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Plan Tier</label>
+            <select id="addPlan" class="form-select">
+              <option value="free">Free Tier</option>
+              <option value="pro">Pro Tier</option>
+              <option value="business">Business Tier</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Role</label>
+            <select id="addRole" class="form-select">
+              <option value="USER">Standard User</option>
+              <option value="ADMIN">Administrator</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-actions" style="margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModals();">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Edit Publication -->
+  <div class="admin-modal-overlay" id="editPubModal">
+    <div class="admin-modal">
+      <div class="admin-modal-header">
+        <h3>Edit Publication Settings</h3>
+        <button class="modal-close-btn" onclick="closeModals();">✕</button>
+      </div>
+      <form id="editPubForm">
+        <input type="hidden" id="editPubId" />
+        <div class="form-group">
+          <label>Publication Title</label>
+          <input type="text" id="editPubTitle" class="form-input" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Category</label>
+            <select id="editPubCategory" class="form-select">
+              <option value="Magazine">Magazine</option>
+              <option value="Brochure">Brochure</option>
+              <option value="Annual Report">Annual Report</option>
+              <option value="Catalogue">Catalogue</option>
+              <option value="Portfolio">Portfolio</option>
+              <option value="Document">Document</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Visibility</label>
+            <select id="editPubVisibility" class="form-select">
+              <option value="PUBLIC">Public (Visible in feed &amp; search)</option>
+              <option value="PASSWORD_PROTECTED">Password Protected</option>
+              <option value="UNLISTED">Unlisted (Direct link only)</option>
+              <option value="PRIVATE">Private (Owner only)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" id="editPubPasswordGroup" style="display:none;">
+          <label>Access Password</label>
+          <input type="password" id="editPubPassword" class="form-input" placeholder="Leave blank to remove password..." />
+        </div>
+        <div class="form-group">
+          <label>Author / Organization</label>
+          <input type="text" id="editPubAuthor" class="form-input" />
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="editPubDesc" class="form-textarea" rows="3"></textarea>
+        </div>
+        <div class="form-actions" style="margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModals();">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Publication</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Global Admin Toast Notification -->
+  <div class="admin-toast" id="adminToast">Notice</div>
 
   <script src="admin.js"></script>
 </body>

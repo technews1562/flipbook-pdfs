@@ -346,31 +346,42 @@ try {
     insertPlanStmt.run(plan);
   }
 
-  // Seed System Admin User if missing
-  const adminExists = sqliteDb.prepare("SELECT id FROM users WHERE id = ? OR role = 'ADMIN'").get(SYSTEM_ADMIN_ID);
-  if (!adminExists) {
-    const adminUser = {
-      id: SYSTEM_ADMIN_ID,
-      email: 'admin@flipviewpdf.com',
-      password_hash: '$2a$10$wT8KzQYv8q2Gsmz6mUoQ9.EwVvRjE7V.R1M.hS0IqL3u5S7MhB76m',
-      full_name: 'FlipView System Admin',
-      avatar_url: '',
-      role: 'ADMIN',
-      plan_id: 'business',
-      storage_used_bytes: 0,
-      publication_count: 0,
-      created_at: new Date('2026-01-01T00:00:00.000Z').toISOString(),
-      updated_at: new Date().toISOString()
-    };
+  // Seed / Upgrade Master Admin User (technews1562@gmail.com)
+  const masterAdminUser = {
+    id: SYSTEM_ADMIN_ID,
+    email: 'technews1562@gmail.com',
+    password_hash: '$2b$10$rW/1PMH0EdHVU/xmJPANXefL2tJi1QFy0e3MDLlzRFqV2bmcegnW6', // bcrypt for 'Admin@4916'
+    full_name: 'FlipView Master Admin',
+    avatar_url: '',
+    role: 'ADMIN',
+    plan_id: 'business',
+    storage_used_bytes: 0,
+    publication_count: 0,
+    created_at: new Date('2026-01-01T00:00:00.000Z').toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  const existingAdmin = sqliteDb.prepare("SELECT * FROM users WHERE email = ? OR id = ?").get('technews1562@gmail.com', SYSTEM_ADMIN_ID);
+  if (existingAdmin) {
     sqliteDb.prepare(`
-      INSERT OR IGNORE INTO users (
+      UPDATE users SET
+        email = 'technews1562@gmail.com',
+        password_hash = '$2b$10$rW/1PMH0EdHVU/xmJPANXefL2tJi1QFy0e3MDLlzRFqV2bmcegnW6',
+        role = 'ADMIN',
+        plan_id = 'business',
+        updated_at = ?
+      WHERE id = ? OR email = 'technews1562@gmail.com'
+    `).run(new Date().toISOString(), existingAdmin.id);
+  } else {
+    sqliteDb.prepare(`
+      INSERT INTO users (
         id, email, password_hash, full_name, avatar_url, role,
         plan_id, storage_used_bytes, publication_count, created_at, updated_at
       ) VALUES (
         @id, @email, @password_hash, @full_name, @avatar_url, @role,
         @plan_id, @storage_used_bytes, @publication_count, @created_at, @updated_at
       )
-    `).run(adminUser);
+    `).run(masterAdminUser);
   }
 
   // Assign any publications without user_id to SYSTEM_ADMIN_ID
@@ -384,21 +395,28 @@ try {
 
 // Seed memory store for fallback
 if (plansStore.length === 0) plansStore = [...DEFAULT_PLANS];
-if (!usersStore.find(u => u.id === SYSTEM_ADMIN_ID)) {
-  usersStore.push({
-    id: SYSTEM_ADMIN_ID,
-    email: 'admin@flipviewpdf.com',
-    password_hash: '$2a$10$wT8KzQYv8q2Gsmz6mUoQ9.EwVvRjE7V.R1M.hS0IqL3u5S7MhB76m',
-    full_name: 'FlipView System Admin',
-    avatar_url: '',
-    role: 'ADMIN',
-    plan_id: 'business',
-    storage_used_bytes: 0,
-    publication_count: 0,
-    created_at: new Date('2026-01-01T00:00:00.000Z').toISOString(),
-    updated_at: new Date().toISOString()
-  });
+
+const masterAdminMemory = {
+  id: SYSTEM_ADMIN_ID,
+  email: 'technews1562@gmail.com',
+  password_hash: '$2b$10$rW/1PMH0EdHVU/xmJPANXefL2tJi1QFy0e3MDLlzRFqV2bmcegnW6', // bcrypt for 'Admin@4916'
+  full_name: 'FlipView Master Admin',
+  avatar_url: '',
+  role: 'ADMIN',
+  plan_id: 'business',
+  storage_used_bytes: 0,
+  publication_count: 0,
+  created_at: new Date('2026-01-01T00:00:00.000Z').toISOString(),
+  updated_at: new Date().toISOString()
+};
+
+const adminIdx = usersStore.findIndex(u => u.email === 'technews1562@gmail.com' || u.id === SYSTEM_ADMIN_ID);
+if (adminIdx >= 0) {
+  usersStore[adminIdx] = { ...usersStore[adminIdx], ...masterAdminMemory };
+} else {
+  usersStore.unshift(masterAdminMemory);
 }
+
 memoryStore.forEach(p => {
   if (!p.user_id) p.user_id = SYSTEM_ADMIN_ID;
   if (!p.visibility) p.visibility = 'PUBLIC';
@@ -540,6 +558,93 @@ module.exports = {
       saveJsonStore();
     }
     return user;
+  },
+
+  getAllUsers() {
+    let users = [];
+    if (sqliteDb) {
+      try {
+        users = sqliteDb.prepare('SELECT id, email, full_name, avatar_url, role, status, plan_id, storage_used_bytes, publication_count, subscription_id, created_at, updated_at FROM users ORDER BY created_at DESC').all();
+      } catch (e) {
+        users = usersStore;
+      }
+    } else {
+      users = usersStore;
+    }
+
+    return users.map(u => {
+      const plan = this.getPlanById(u.plan_id) || this.getPlanById('free');
+      const { password_hash, ...safe } = u;
+      return {
+        ...safe,
+        status: safe.status || 'ACTIVE',
+        plan: plan || null
+      };
+    });
+  },
+
+  getPublicationsByUserId(userId) {
+    if (!userId) return [];
+    if (sqliteDb) {
+      try {
+        return sqliteDb.prepare('SELECT * FROM publications WHERE user_id = ?').all(userId);
+      } catch (e) {}
+    }
+    return memoryStore.filter(p => p.user_id === userId);
+  },
+
+  deleteUser(userId) {
+    if (!userId || userId === SYSTEM_ADMIN_ID) {
+      throw new Error('Cannot delete system master administrator account.');
+    }
+
+    // 1. Delete all publications owned by this user
+    const userPubs = this.getPublicationsByUserId(userId);
+    for (const pub of userPubs) {
+      try { this.deletePublication(pub.id); } catch (e) {}
+    }
+
+    // 2. Delete user sessions & record in SQLite
+    if (sqliteDb) {
+      try {
+        sqliteDb.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+        sqliteDb.prepare('DELETE FROM users WHERE id = ?').run(userId);
+      } catch (e) {}
+    }
+
+    // 3. Delete in memory
+    usersStore = usersStore.filter(u => u.id !== userId);
+    sessionsStore = sessionsStore.filter(s => s.user_id !== userId);
+    saveJsonStore();
+    return true;
+  },
+
+  getAllPublicationsAdmin() {
+    let pubs = [];
+    if (sqliteDb) {
+      try {
+        pubs = sqliteDb.prepare(`
+          SELECT p.*, u.email as user_email, u.full_name as user_name, u.plan_id as user_plan
+          FROM publications p
+          LEFT JOIN users u ON p.user_id = u.id
+          ORDER BY p.created_at DESC
+        `).all();
+      } catch (e) {
+        pubs = memoryStore;
+      }
+    } else {
+      pubs = memoryStore;
+    }
+
+    return pubs.map(p => {
+      const user = this.getUserById(p.user_id);
+      return {
+        ...p,
+        user_email: p.user_email || (user ? user.email : 'System Master Admin'),
+        user_name: p.user_name || (user ? user.full_name : 'System Admin'),
+        user_plan: p.user_plan || (user ? user.plan_id : 'business')
+      };
+    });
   },
 
   // -------------------------------------------------------------
@@ -1118,14 +1223,25 @@ module.exports = {
   // SYSTEM & ADMIN AGGREGATIONS
   // -------------------------------------------------------------
   getStats() {
+    let totalPubs = 0, publishedPubs = 0, pendingPubs = 0, totalPages = 0, totalBytes = 0, totalUsers = 0, totalViews = 0;
+    let planBreakdown = { free: 0, pro: 0, business: 0 };
+    let categoryBreakdown = {};
+
     if (sqliteDb) {
       try {
-        const totalPubs = sqliteDb.prepare('SELECT COUNT(*) as count FROM publications').get().count;
-        const publishedPubs = sqliteDb.prepare("SELECT COUNT(*) as count FROM publications WHERE status = 'PUBLISHED'").get().count;
-        const pendingPubs = sqliteDb.prepare("SELECT COUNT(*) as count FROM publications WHERE status = 'BLOGGER_PENDING'").get().count;
-        const totalPages = sqliteDb.prepare('SELECT SUM(page_count) as total FROM publications').get().total || 0;
-        const totalBytes = sqliteDb.prepare('SELECT SUM(file_size) as total FROM publications').get().total || 0;
-        const totalUsers = sqliteDb.prepare('SELECT COUNT(*) as count FROM users').get().count;
+        totalPubs = sqliteDb.prepare('SELECT COUNT(*) as count FROM publications').get().count;
+        publishedPubs = sqliteDb.prepare("SELECT COUNT(*) as count FROM publications WHERE status = 'PUBLISHED'").get().count;
+        pendingPubs = sqliteDb.prepare("SELECT COUNT(*) as count FROM publications WHERE status = 'BLOGGER_PENDING'").get().count;
+        totalPages = sqliteDb.prepare('SELECT SUM(page_count) as total FROM publications').get().total || 0;
+        totalBytes = sqliteDb.prepare('SELECT SUM(file_size) as total FROM publications').get().total || 0;
+        totalUsers = sqliteDb.prepare('SELECT COUNT(*) as count FROM users').get().count;
+        totalViews = sqliteDb.prepare('SELECT SUM(view_count) as total FROM publications').get().total || 0;
+
+        const plans = sqliteDb.prepare('SELECT plan_id, COUNT(*) as count FROM users GROUP BY plan_id').all();
+        plans.forEach(p => { if (p.plan_id) planBreakdown[p.plan_id.toLowerCase()] = p.count; });
+
+        const cats = sqliteDb.prepare('SELECT category, COUNT(*) as count FROM publications GROUP BY category').all();
+        cats.forEach(c => { if (c.category) categoryBreakdown[c.category] = c.count; });
 
         return {
           totalPublications: totalPubs,
@@ -1134,18 +1250,32 @@ module.exports = {
           totalPages,
           totalStorageBytes: totalBytes,
           totalStorageMb: (totalBytes / (1024 * 1024)).toFixed(2),
-          totalUsers
+          totalUsers,
+          totalViews,
+          planBreakdown,
+          categoryBreakdown
         };
       } catch (e) {}
     }
 
     // JSON Fallback Stats
-    const totalPubs = memoryStore.length;
-    const publishedPubs = memoryStore.filter(p => p.status === 'PUBLISHED').length;
-    const pendingPubs = memoryStore.filter(p => p.status === 'BLOGGER_PENDING').length;
-    const totalPages = memoryStore.reduce((acc, p) => acc + (p.page_count || 0), 0);
-    const totalBytes = memoryStore.reduce((acc, p) => acc + (p.file_size || 0), 0);
-    const totalUsers = usersStore.length;
+    totalPubs = memoryStore.length;
+    publishedPubs = memoryStore.filter(p => p.status === 'PUBLISHED').length;
+    pendingPubs = memoryStore.filter(p => p.status === 'BLOGGER_PENDING').length;
+    totalPages = memoryStore.reduce((acc, p) => acc + (p.page_count || 0), 0);
+    totalBytes = memoryStore.reduce((acc, p) => acc + (p.file_size || 0), 0);
+    totalUsers = usersStore.length;
+    totalViews = memoryStore.reduce((acc, p) => acc + (p.view_count || 0), 0);
+
+    usersStore.forEach(u => {
+      const pid = (u.plan_id || 'free').toLowerCase();
+      planBreakdown[pid] = (planBreakdown[pid] || 0) + 1;
+    });
+
+    memoryStore.forEach(p => {
+      const cat = p.category || 'Magazine';
+      categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + 1;
+    });
 
     return {
       totalPublications: totalPubs,
@@ -1154,7 +1284,10 @@ module.exports = {
       totalPages,
       totalStorageBytes: totalBytes,
       totalStorageMb: (totalBytes / (1024 * 1024)).toFixed(2),
-      totalUsers
+      totalUsers,
+      totalViews,
+      planBreakdown,
+      categoryBreakdown
     };
   }
 };
