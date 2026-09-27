@@ -116,96 +116,95 @@
     }
   }
 
-  // --- Heyzine-Grade Paper Flip Sound Engine ---
-  let audioContext = null;
+  // --- Heyzine-Grade Authentic Recorded Page Flip Sound System ---
+  let pageFlipAudioBuffer = null;
+  let audioCtx = null;
+  const pageFlipAudioPool = [];
+  const POOL_SIZE = 4;
+  let audioPoolIndex = 0;
 
-  function initAudio() {
-    if (!audioContext) {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        audioContext = new AudioCtx();
+  // Pre-initialize audio elements for rapid HTML5 playback
+  try {
+    for (let i = 0; i < POOL_SIZE; i++) {
+      const audio = new Audio('/viewer/page-flip.mp3');
+      audio.preload = 'auto';
+      pageFlipAudioPool.push(audio);
+    }
+  } catch (e) {}
+
+  function initAudioEngine() {
+    if (!audioCtx) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtx = new AudioContextClass();
+        fetch('/viewer/page-flip.mp3')
+          .then(res => {
+            if (!res.ok) throw new Error('Sound fetch error');
+            return res.arrayBuffer();
+          })
+          .then(buffer => audioCtx.decodeAudioData(buffer))
+          .then(decoded => {
+            pageFlipAudioBuffer = decoded;
+          })
+          .catch(() => {});
       }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
     }
   }
 
-  // Synthesis of Realistic Crisp Page Turn Sound (Triple-Layer Physics Simulation)
+  // Pre-unlock audio on user's first physical interaction
+  const unlockAudio = () => {
+    initAudioEngine();
+    window.removeEventListener('click', unlockAudio);
+    window.removeEventListener('touchstart', unlockAudio);
+    window.removeEventListener('keydown', unlockAudio);
+  };
+  window.addEventListener('click', unlockAudio, { once: true, passive: true });
+  window.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
+  window.addEventListener('keydown', unlockAudio, { once: true, passive: true });
+
+  // Play Crisp Physical Paper Flip Audio
   function playPaperSound() {
     if (!soundEnabled) return;
     const now = Date.now();
-    if (now - lastPageTurnTime < 180) return; // Debounce rapid triggers
+    if (now - lastPageTurnTime < 120) return; // Debounce rapid multi-triggers
     lastPageTurnTime = now;
 
     try {
-      initAudio();
-      if (!audioContext) return;
-      if (audioContext.state === 'suspended') {
-        audioContext.resume();
+      initAudioEngine();
+
+      // Priority 1: Web Audio Buffer (0ms instant latency, true concurrent mixing)
+      if (audioCtx && pageFlipAudioBuffer) {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+        const source = audioCtx.createBufferSource();
+        source.buffer = pageFlipAudioBuffer;
+
+        const gainNode = audioCtx.createGain();
+        // Slight natural volume dynamics
+        gainNode.gain.value = 0.88;
+
+        source.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        source.start(0);
+        return;
       }
 
-      const t0 = audioContext.currentTime;
-      const sampleRate = audioContext.sampleRate;
-
-      // Layer 1: Natural Paper Friction / White-Pink Noise Burst
-      const duration = 0.18; // 180ms
-      const bufferSize = Math.floor(sampleRate * duration);
-      const noiseBuffer = audioContext.createBuffer(1, bufferSize, sampleRate);
-      const output = noiseBuffer.getChannelData(0);
-
-      let lastOut = 0.0;
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        lastOut = (lastOut * 0.90) + (white * 0.10);
-        const env = Math.sin((i / bufferSize) * Math.PI) * Math.exp(-i / (bufferSize * 0.45));
-        output[i] = (lastOut * 0.65 + white * 0.35) * env;
+      // Priority 2: HTML5 Audio Pool Fallback
+      if (pageFlipAudioPool.length > 0) {
+        const audio = pageFlipAudioPool[audioPoolIndex];
+        audioPoolIndex = (audioPoolIndex + 1) % pageFlipAudioPool.length;
+        if (audio) {
+          audio.currentTime = 0;
+          audio.volume = 0.88;
+          audio.play().catch(() => {});
+        }
       }
-
-      const noiseSource = audioContext.createBufferSource();
-      noiseSource.buffer = noiseBuffer;
-
-      // Sweeping Bandpass Filter (Simulates air glide and paper curve)
-      const filter = audioContext.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(3200, t0);
-      filter.frequency.exponentialRampToValueAtTime(800, t0 + duration);
-      filter.Q.setValueAtTime(1.9, t0);
-
-      // Amplitude Envelope
-      const gainNode = audioContext.createGain();
-      gainNode.gain.setValueAtTime(0.001, t0);
-      gainNode.gain.linearRampToValueAtTime(0.24, t0 + 0.02);
-      gainNode.gain.exponentialRampToValueAtTime(0.0005, t0 + duration);
-
-      noiseSource.connect(filter);
-      filter.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      noiseSource.start(t0);
-
-      // Layer 2: High-Frequency Snap / Edge Flick
-      const snapDuration = 0.05;
-      const snapSize = Math.floor(sampleRate * snapDuration);
-      const snapBuffer = audioContext.createBuffer(1, snapSize, sampleRate);
-      const snapData = snapBuffer.getChannelData(0);
-      for (let j = 0; j < snapSize; j++) {
-        snapData[j] = (Math.random() * 2 - 1) * Math.exp(-j / (snapSize * 0.22));
-      }
-      const snapSource = audioContext.createBufferSource();
-      snapSource.buffer = snapBuffer;
-
-      const snapFilter = audioContext.createBiquadFilter();
-      snapFilter.type = 'highpass';
-      snapFilter.frequency.setValueAtTime(3800, t0);
-
-      const snapGain = audioContext.createGain();
-      snapGain.gain.setValueAtTime(0.12, t0);
-      snapGain.gain.exponentialRampToValueAtTime(0.001, t0 + snapDuration);
-
-      snapSource.connect(snapFilter);
-      snapFilter.connect(snapGain);
-      snapGain.connect(audioContext.destination);
-      snapSource.start(t0 + 0.012);
-
     } catch (e) {
-      // Audio autoplay restrictions or unsupported
+      // Audio autoplay policy fallback
     }
   }
 
@@ -1221,23 +1220,53 @@
     }
 
     // QR Code Modal
-    if (el.qrBtn) {
-      el.qrBtn.onclick = async () => {
-        if (el.qrModal) el.qrModal.classList.add('open');
-        if (!window.QRCode) {
-          await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js');
-        }
-        const qrCanvas = document.getElementById('fvQrCanvas');
-        if (qrCanvas && window.QRCode) {
-          qrCanvas.innerHTML = '';
-          new QRCode(qrCanvas, {
-            text: window.location.href,
+    function renderViewerQrCode() {
+      const qrContainer = document.getElementById('fvQrContainer') || document.getElementById('fvQrCanvas');
+      if (!qrContainer) return;
+      const currentUrl = window.location.href;
+
+      qrContainer.innerHTML = '';
+
+      // Tier 1: Client-Side Vector Rendering if QRCode.js is loaded
+      if (window.QRCode) {
+        try {
+          new window.QRCode(qrContainer, {
+            text: currentUrl,
             width: 180,
             height: 180,
             colorDark: '#0f172a',
             colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.H
+            correctLevel: window.QRCode.CorrectLevel.M
           });
+          return;
+        } catch (e) {}
+      }
+
+      // Tier 2: Instant High-Definition SVG/PNG QR Code Fallback Image
+      const qrImg = document.createElement('img');
+      qrImg.alt = 'Flipbook Mobile QR Code';
+      qrImg.width = 180;
+      qrImg.height = 180;
+      qrImg.style.width = '180px';
+      qrImg.style.height = '180px';
+      qrImg.style.display = 'block';
+      qrImg.style.borderRadius = '8px';
+      qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(currentUrl)}&color=0f172a&bgcolor=ffffff`;
+      qrContainer.appendChild(qrImg);
+    }
+
+    if (el.qrBtn) {
+      el.qrBtn.onclick = async () => {
+        if (el.qrModal) el.qrModal.classList.add('open');
+        renderViewerQrCode();
+
+        if (!window.QRCode) {
+          try {
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js');
+            if (window.QRCode) {
+              renderViewerQrCode();
+            }
+          } catch (e) {}
         }
       };
     }
