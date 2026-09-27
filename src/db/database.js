@@ -110,6 +110,20 @@ function loadJsonStore() {
     if (fs.existsSync(jsonPasswordResetsPath)) {
       passwordResetsStore = JSON.parse(fs.readFileSync(jsonPasswordResetsPath, 'utf8'));
     }
+
+    usersStore = usersStore.filter(u => !u.email.endsWith('@example.com') && !u.id.startsWith('usr_test'));
+    memoryStore = memoryStore.filter(p => 
+      !p.id.startsWith('pub_test_') &&
+      !p.title.includes('Alice Annual Report') &&
+      !p.title.includes('Test Flipbook') &&
+      !p.title.includes('Legacy Blogger Document') &&
+      !p.title.includes('Protected Document') &&
+      !p.title.includes('Protected Financial') &&
+      !p.title.includes('Strictly Confidential') &&
+      !p.title.includes('Unlisted Corporate') &&
+      !p.title.includes('Public Architecture Magazine')
+    );
+    sessionsStore = sessionsStore.filter(s => usersStore.some(u => u.id === s.user_id));
   } catch (e) {
     console.warn('[DB] Failed to load JSON store:', e.message);
   }
@@ -117,22 +131,45 @@ function loadJsonStore() {
 
 let r2SyncTimer = null;
 
+function isTestEnvironment() {
+  return process.env.NODE_ENV === 'test' || process.env.IS_TEST_SUITE === 'true' || process.env.NO_R2_SYNC === 'true';
+}
+
 async function syncToCloudflareR2() {
+  // CRITICAL PRODUCTION GUARD: Never push test suite data to Cloudflare R2
+  if (isTestEnvironment()) return;
+
   const ss = getStorageService();
   if (!ss || !ss.isR2Configured) return;
 
   try {
-    // 1. Sync publications catalog
-    const pubBuffer = Buffer.from(JSON.stringify(memoryStore, null, 2), 'utf8');
+    // 1. Sync publications catalog (filtering out test artifacts)
+    const cleanPublications = memoryStore.filter(p => 
+      !p.id.startsWith('pub_test_') &&
+      !p.title.includes('Alice Annual Report') &&
+      !p.title.includes('Test Flipbook') &&
+      !p.title.includes('Legacy Blogger Document') &&
+      !p.title.includes('Protected Document') &&
+      !p.title.includes('Protected Financial') &&
+      !p.title.includes('Strictly Confidential') &&
+      !p.title.includes('Unlisted Corporate') &&
+      !p.title.includes('Public Architecture Magazine')
+    );
+    const pubBuffer = Buffer.from(JSON.stringify(cleanPublications, null, 2), 'utf8');
     await ss.upload('catalog/publications.json', pubBuffer, 'application/json');
 
-    // 2. Sync users catalog (preserves all registered users across deployments)
-    const usersBuffer = Buffer.from(JSON.stringify(usersStore, null, 2), 'utf8');
+    // 2. Sync users catalog (filter out dummy/mock test accounts)
+    const cleanUsers = usersStore.filter(u => 
+      !u.email.endsWith('@example.com') && 
+      !u.id.startsWith('usr_test')
+    );
+    const usersBuffer = Buffer.from(JSON.stringify(cleanUsers, null, 2), 'utf8');
     await ss.upload('catalog/users.json', usersBuffer, 'application/json');
 
-    // 3. Sync sessions (keeps active user logins alive across deployments)
-    if (sessionsStore.length > 0) {
-      const sessBuffer = Buffer.from(JSON.stringify(sessionsStore, null, 2), 'utf8');
+    // 3. Sync sessions (keeps active real user logins alive across deployments)
+    const cleanSessions = sessionsStore.filter(s => cleanUsers.some(u => u.id === s.user_id));
+    if (cleanSessions.length > 0) {
+      const sessBuffer = Buffer.from(JSON.stringify(cleanSessions, null, 2), 'utf8');
       await ss.upload('catalog/sessions.json', sessBuffer, 'application/json');
     }
 
@@ -153,6 +190,9 @@ async function syncToCloudflareR2() {
 }
 
 async function syncFromCloudflareR2() {
+  // CRITICAL PRODUCTION GUARD: Never pull cloud catalog during test executions
+  if (isTestEnvironment()) return;
+
   const ss = getStorageService();
   if (!ss || !ss.isR2Configured) return;
 
@@ -161,8 +201,9 @@ async function syncFromCloudflareR2() {
     try {
       const usersBuf = await ss.getBuffer('catalog/users.json');
       if (usersBuf) {
-        const loadedUsers = JSON.parse(usersBuf.toString('utf8'));
-        if (Array.isArray(loadedUsers) && loadedUsers.length > 0) {
+        const rawUsers = JSON.parse(usersBuf.toString('utf8'));
+        const loadedUsers = Array.isArray(rawUsers) ? rawUsers.filter(u => !u.email.endsWith('@example.com') && !u.id.startsWith('usr_test')) : [];
+        if (loadedUsers.length > 0) {
           loadedUsers.forEach(u => {
             if (!u.id || !u.email) return;
             const existingIdx = usersStore.findIndex(item => item.id === u.id || (item.email && item.email.toLowerCase() === u.email.toLowerCase()));
@@ -198,8 +239,19 @@ async function syncFromCloudflareR2() {
     try {
       const pubBuf = await ss.getBuffer('catalog/publications.json');
       if (pubBuf) {
-        const loadedPubs = JSON.parse(pubBuf.toString('utf8'));
-        if (Array.isArray(loadedPubs) && loadedPubs.length > 0) {
+        const rawPubs = JSON.parse(pubBuf.toString('utf8'));
+        const loadedPubs = Array.isArray(rawPubs) ? rawPubs.filter(item => 
+          !item.id.startsWith('pub_test_') &&
+          !item.title.includes('Alice Annual Report') &&
+          !item.title.includes('Test Flipbook') &&
+          !item.title.includes('Legacy Blogger Document') &&
+          !item.title.includes('Protected Document') &&
+          !item.title.includes('Protected Financial') &&
+          !item.title.includes('Strictly Confidential') &&
+          !item.title.includes('Unlisted Corporate') &&
+          !item.title.includes('Public Architecture Magazine')
+        ) : [];
+        if (loadedPubs.length > 0) {
           loadedPubs.forEach(item => {
             if (!item.user_id) item.user_id = SYSTEM_ADMIN_ID;
             if (!item.visibility) item.visibility = 'PUBLIC';
@@ -271,6 +323,10 @@ async function syncFromCloudflareR2() {
 }
 
 function saveJsonStoreLocal() {
+  if (isTestEnvironment()) {
+    // In test mode, do not write test fixtures to production JSON store files
+    return;
+  }
   try {
     fs.writeFileSync(jsonDbPath, JSON.stringify(memoryStore, null, 2), 'utf8');
     fs.writeFileSync(jsonUsersPath, JSON.stringify(usersStore, null, 2), 'utf8');

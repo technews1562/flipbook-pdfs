@@ -105,11 +105,15 @@
     const overlay = document.getElementById('adminLoginOverlay');
     const layout = document.getElementById('appLayout');
     const adminEmailEl = document.getElementById('sidebarAdminEmail');
+    const settingsAdminEmailEl = document.getElementById('settingsAdminEmail');
 
     if (overlay) overlay.style.display = 'none';
     if (layout) layout.style.display = 'flex';
     if (adminEmailEl && user) {
-      adminEmailEl.textContent = user.email || 'technews1562@gmail.com';
+      adminEmailEl.textContent = user.email || 'Admin';
+    }
+    if (settingsAdminEmailEl && user) {
+      settingsAdminEmailEl.textContent = user.email || 'Admin';
     }
 
     loadStats();
@@ -186,6 +190,8 @@
   function handleLogout() {
     clearAdminToken();
     currentUser = null;
+    const pwdInput = document.getElementById('loginPassword');
+    if (pwdInput) pwdInput.value = '';
     showToast('You have been logged out.');
     showLoginOverlay();
   }
