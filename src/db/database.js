@@ -84,6 +84,22 @@ const DEFAULT_PLANS = [
 
 const SYSTEM_ADMIN_ID = 'usr_system_admin';
 
+const masterAdminMemory = {
+  id: SYSTEM_ADMIN_ID,
+  email: 'technews1562@gmail.com',
+  password_hash: '$2b$10$rW/1PMH0EdHVU/xmJPANXefL2tJi1QFy0e3MDLlzRFqV2bmcegnW6', // bcrypt for 'Admin@4916'
+  full_name: 'FlipView Master Admin',
+  avatar_url: '',
+  role: 'ADMIN',
+  plan_id: 'business',
+  storage_used_bytes: 0,
+  publication_count: 0,
+  created_at: new Date('2026-01-01T00:00:00.000Z').toISOString(),
+  updated_at: new Date().toISOString()
+};
+
+let isR2InitialPullCompleted = false;
+
 // Load Stores from Local JSON
 function loadJsonStore() {
   try {
@@ -111,21 +127,12 @@ function loadJsonStore() {
       passwordResetsStore = JSON.parse(fs.readFileSync(jsonPasswordResetsPath, 'utf8'));
     }
 
-    usersStore = usersStore.filter(u => !u.email.endsWith('@example.com') && !u.id.startsWith('usr_test'));
-    memoryStore = memoryStore.filter(p => 
-      !p.id.startsWith('pub_test_') &&
-      !p.title.includes('Alice Annual Report') &&
-      !p.title.includes('Test Flipbook') &&
-      !p.title.includes('Legacy Blogger Document') &&
-      !p.title.includes('Protected Document') &&
-      !p.title.includes('Protected Financial') &&
-      !p.title.includes('Strictly Confidential') &&
-      !p.title.includes('Unlisted Corporate') &&
-      !p.title.includes('Public Architecture Magazine')
-    );
-    sessionsStore = sessionsStore.filter(s => usersStore.some(u => u.id === s.user_id));
+    if (isTestEnvironment()) {
+      usersStore = usersStore.filter(u => !u.email.endsWith('@example.com') && !u.id.startsWith('usr_test'));
+      memoryStore = memoryStore.filter(p => !p.id.startsWith('pub_test_'));
+    }
   } catch (e) {
-    console.warn('[DB] Failed to load JSON store:', e.message);
+    console.warn('[DB] Failed to load local JSON store:', e.message);
   }
 }
 
@@ -136,40 +143,30 @@ function isTestEnvironment() {
 }
 
 async function syncToCloudflareR2() {
-  // CRITICAL PRODUCTION GUARD: Never push test suite data to Cloudflare R2
+  // CRITICAL PRODUCTION GUARD: Never push test suite data or push before initial pull completes
   if (isTestEnvironment()) return;
+  if (!isR2InitialPullCompleted) {
+    console.log('[DB] syncToCloudflareR2 deferred: initial pull from Cloudflare R2 is still in progress.');
+    return;
+  }
 
   const ss = getStorageService();
   if (!ss || !ss.isR2Configured) return;
 
   try {
-    // 1. Sync publications catalog (filtering out test artifacts)
-    const cleanPublications = memoryStore.filter(p => 
-      !p.id.startsWith('pub_test_') &&
-      !p.title.includes('Alice Annual Report') &&
-      !p.title.includes('Test Flipbook') &&
-      !p.title.includes('Legacy Blogger Document') &&
-      !p.title.includes('Protected Document') &&
-      !p.title.includes('Protected Financial') &&
-      !p.title.includes('Strictly Confidential') &&
-      !p.title.includes('Unlisted Corporate') &&
-      !p.title.includes('Public Architecture Magazine')
-    );
+    // 1. Sync publications catalog
+    const cleanPublications = memoryStore.filter(p => !p.id.startsWith('pub_test_'));
     const pubBuffer = Buffer.from(JSON.stringify(cleanPublications, null, 2), 'utf8');
     await ss.upload('catalog/publications.json', pubBuffer, 'application/json');
 
-    // 2. Sync users catalog (filter out dummy/mock test accounts)
-    const cleanUsers = usersStore.filter(u => 
-      !u.email.endsWith('@example.com') && 
-      !u.id.startsWith('usr_test')
-    );
+    // 2. Sync users catalog
+    const cleanUsers = usersStore.filter(u => !u.id.startsWith('usr_test_mock_'));
     const usersBuffer = Buffer.from(JSON.stringify(cleanUsers, null, 2), 'utf8');
     await ss.upload('catalog/users.json', usersBuffer, 'application/json');
 
-    // 3. Sync sessions (keeps active real user logins alive across deployments)
-    const cleanSessions = sessionsStore.filter(s => cleanUsers.some(u => u.id === s.user_id));
-    if (cleanSessions.length > 0) {
-      const sessBuffer = Buffer.from(JSON.stringify(cleanSessions, null, 2), 'utf8');
+    // 3. Sync sessions
+    if (sessionsStore.length > 0) {
+      const sessBuffer = Buffer.from(JSON.stringify(sessionsStore, null, 2), 'utf8');
       await ss.upload('catalog/sessions.json', sessBuffer, 'application/json');
     }
 
@@ -190,11 +187,16 @@ async function syncToCloudflareR2() {
 }
 
 async function syncFromCloudflareR2() {
-  // CRITICAL PRODUCTION GUARD: Never pull cloud catalog during test executions
-  if (isTestEnvironment()) return;
+  if (isTestEnvironment()) {
+    isR2InitialPullCompleted = true;
+    return;
+  }
 
   const ss = getStorageService();
-  if (!ss || !ss.isR2Configured) return;
+  if (!ss || !ss.isR2Configured) {
+    isR2InitialPullCompleted = true;
+    return;
+  }
 
   try {
     // 1. Restore Users from Cloudflare R2
@@ -202,7 +204,7 @@ async function syncFromCloudflareR2() {
       const usersBuf = await ss.getBuffer('catalog/users.json');
       if (usersBuf) {
         const rawUsers = JSON.parse(usersBuf.toString('utf8'));
-        const loadedUsers = Array.isArray(rawUsers) ? rawUsers.filter(u => !u.email.endsWith('@example.com') && !u.id.startsWith('usr_test')) : [];
+        const loadedUsers = Array.isArray(rawUsers) ? rawUsers : [];
         if (loadedUsers.length > 0) {
           loadedUsers.forEach(u => {
             if (!u.id || !u.email) return;
@@ -210,9 +212,8 @@ async function syncFromCloudflareR2() {
             if (existingIdx === -1) {
               usersStore.push(u);
             } else {
-              // Preserve existing user properties unless it's master admin being upgraded
               if (u.id !== SYSTEM_ADMIN_ID && u.email !== 'technews1562@gmail.com') {
-                usersStore[existingIdx] = { ...u, ...usersStore[existingIdx] };
+                usersStore[existingIdx] = { ...usersStore[existingIdx], ...u };
               }
             }
 
@@ -235,22 +236,34 @@ async function syncFromCloudflareR2() {
       }
     } catch (e) {}
 
+    // Ensure Master Admin account is always present with admin credentials
+    const adminIdx = usersStore.findIndex(u => u.email === 'technews1562@gmail.com' || u.id === SYSTEM_ADMIN_ID);
+    if (adminIdx >= 0) {
+      usersStore[adminIdx] = { ...usersStore[adminIdx], ...masterAdminMemory };
+    } else {
+      usersStore.unshift(masterAdminMemory);
+    }
+    if (sqliteDb) {
+      try {
+        sqliteDb.prepare(`
+          INSERT OR REPLACE INTO users (
+            id, email, password_hash, full_name, avatar_url, role,
+            plan_id, storage_used_bytes, publication_count, created_at, updated_at
+          ) VALUES (
+            @id, @email, @password_hash, @full_name, @avatar_url, @role,
+            @plan_id, @storage_used_bytes, @publication_count, @created_at, @updated_at
+          )
+        `).run(masterAdminMemory);
+      } catch (e) {}
+    }
+
     // 2. Restore Publications from Cloudflare R2
+    let publicationsRestored = 0;
     try {
       const pubBuf = await ss.getBuffer('catalog/publications.json');
       if (pubBuf) {
         const rawPubs = JSON.parse(pubBuf.toString('utf8'));
-        const loadedPubs = Array.isArray(rawPubs) ? rawPubs.filter(item => 
-          !item.id.startsWith('pub_test_') &&
-          !item.title.includes('Alice Annual Report') &&
-          !item.title.includes('Test Flipbook') &&
-          !item.title.includes('Legacy Blogger Document') &&
-          !item.title.includes('Protected Document') &&
-          !item.title.includes('Protected Financial') &&
-          !item.title.includes('Strictly Confidential') &&
-          !item.title.includes('Unlisted Corporate') &&
-          !item.title.includes('Public Architecture Magazine')
-        ) : [];
+        const loadedPubs = Array.isArray(rawPubs) ? rawPubs.filter(item => !item.id.startsWith('pub_test_')) : [];
         if (loadedPubs.length > 0) {
           loadedPubs.forEach(item => {
             if (!item.user_id) item.user_id = SYSTEM_ADMIN_ID;
@@ -258,11 +271,13 @@ async function syncFromCloudflareR2() {
             const existingIdx = memoryStore.findIndex(p => p.id === item.id);
             if (existingIdx === -1) {
               memoryStore.push(item);
+            } else {
+              memoryStore[existingIdx] = { ...memoryStore[existingIdx], ...item };
             }
             if (sqliteDb) {
               try {
                 sqliteDb.prepare(`
-                  INSERT OR IGNORE INTO publications (
+                  INSERT OR REPLACE INTO publications (
                     id, user_id, title, slug, category, description, author,
                     pdf_filename, storage_key, pdf_url, cover_url,
                     page_count, file_size, file_hash, status, published, visibility,
@@ -281,6 +296,7 @@ async function syncFromCloudflareR2() {
               } catch (e) {}
             }
           });
+          publicationsRestored = loadedPubs.length;
           console.log(`[DB] Successfully synchronized ${loadedPubs.length} publications from Cloudflare R2 catalog.`);
         }
       }
@@ -301,7 +317,18 @@ async function syncFromCloudflareR2() {
       }
     } catch (e) {}
 
-    // 4. Restore Analytics from Cloudflare R2
+    // 4. Restore Plans from Cloudflare R2
+    try {
+      const plansBuf = await ss.getBuffer('catalog/plans.json');
+      if (plansBuf) {
+        const loadedPlans = JSON.parse(plansBuf.toString('utf8'));
+        if (Array.isArray(loadedPlans) && loadedPlans.length > 0) {
+          plansStore = loadedPlans;
+        }
+      }
+    } catch (e) {}
+
+    // 5. Restore Analytics from Cloudflare R2
     try {
       const analyticsBuf = await ss.getBuffer('catalog/analytics.json');
       if (analyticsBuf) {
@@ -317,14 +344,16 @@ async function syncFromCloudflareR2() {
     } catch (e) {}
 
     saveJsonStoreLocal();
+    isR2InitialPullCompleted = true;
+    console.log('[DB] Cloudflare R2 data restore completed successfully.');
   } catch (err) {
+    isR2InitialPullCompleted = true;
     console.warn('[DB] Error during Cloudflare R2 data restore:', err.message);
   }
 }
 
 function saveJsonStoreLocal() {
   if (isTestEnvironment()) {
-    // In test mode, do not write test fixtures to production JSON store files
     return;
   }
   try {
@@ -347,9 +376,6 @@ function saveJsonStore() {
     syncToCloudflareR2().catch(() => {});
   }, 400);
 }
-
-loadJsonStore();
-setTimeout(syncFromCloudflareR2, 1000);
 
 // -------------------------------------------------------------
 // SQLITE INITIALIZATION & MIGRATIONS
@@ -578,20 +604,6 @@ try {
 // Seed memory store for fallback
 if (plansStore.length === 0) plansStore = [...DEFAULT_PLANS];
 
-const masterAdminMemory = {
-  id: SYSTEM_ADMIN_ID,
-  email: 'technews1562@gmail.com',
-  password_hash: '$2b$10$rW/1PMH0EdHVU/xmJPANXefL2tJi1QFy0e3MDLlzRFqV2bmcegnW6', // bcrypt for 'Admin@4916'
-  full_name: 'FlipView Master Admin',
-  avatar_url: '',
-  role: 'ADMIN',
-  plan_id: 'business',
-  storage_used_bytes: 0,
-  publication_count: 0,
-  created_at: new Date('2026-01-01T00:00:00.000Z').toISOString(),
-  updated_at: new Date().toISOString()
-};
-
 const adminIdx = usersStore.findIndex(u => u.email === 'technews1562@gmail.com' || u.id === SYSTEM_ADMIN_ID);
 if (adminIdx >= 0) {
   usersStore[adminIdx] = { ...usersStore[adminIdx], ...masterAdminMemory };
@@ -599,16 +611,15 @@ if (adminIdx >= 0) {
   usersStore.unshift(masterAdminMemory);
 }
 
-memoryStore.forEach(p => {
-  if (!p.user_id) p.user_id = SYSTEM_ADMIN_ID;
-  if (!p.visibility) p.visibility = 'PUBLIC';
-  if (p.has_branding === undefined) p.has_branding = 1;
-  if (p.view_count === undefined) p.view_count = 0;
-});
-saveJsonStore();
-
 module.exports = {
   SYSTEM_ADMIN_ID,
+  initializeDatabase: async function() {
+    loadJsonStore();
+    await syncFromCloudflareR2();
+    return true;
+  },
+  syncFromCloudflareR2,
+  syncToCloudflareR2,
 
   // -------------------------------------------------------------
   // USER METHODS

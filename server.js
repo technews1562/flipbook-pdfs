@@ -92,18 +92,32 @@ app.use((err, req, res, next) => {
   });
 });
 
-const server = app.listen(config.port, '0.0.0.0', () => {
-  console.log(`\n========================================================`);
-  console.log(`🚀 FlipView Production Core API running on port ${config.port}`);
-  console.log(`🌐 Admin Dashboard : http://localhost:${config.port}/admin`);
-  console.log(`🔐 Auth API        : http://localhost:${config.port}/api/auth`);
-  console.log(`📤 Uploads API     : http://localhost:${config.port}/api/uploads`);
-  console.log(`📦 Storage Engine  : ${storageService.isR2Configured ? 'Cloudflare R2 (' + config.storage.bucketName + ')' : 'Local Disk Fallback'}`);
-  console.log(`📰 Blogger Blog ID : ${config.blogger.blogId}`);
-  console.log(`========================================================\n`);
-});
+const db = require('./src/db/database');
 
-server.keepAliveTimeout = 120000;
-server.headersTimeout = 120000;
+async function startServer() {
+  try {
+    console.log('[Server] Initializing database & syncing from Cloudflare R2...');
+    await db.initializeDatabase();
+    console.log('[Server] Database initialized successfully.');
+  } catch (err) {
+    console.warn('[Server] Database initialization warning:', err.message);
+  }
+
+  const server = app.listen(config.port, '0.0.0.0', () => {
+    console.log(`\n========================================================`);
+    console.log(`🚀 FlipView Production Core API running on port ${config.port}`);
+    console.log(`🌐 Admin Dashboard : http://localhost:${config.port}/admin`);
+    console.log(`🔐 Auth API        : http://localhost:${config.port}/api/auth`);
+    console.log(`📤 Uploads API     : http://localhost:${config.port}/api/uploads`);
+    console.log(`📦 Storage Engine  : ${storageService.isR2Configured ? 'Cloudflare R2 (' + config.storage.bucketName + ')' : 'Local Disk Fallback'}`);
+    console.log(`📰 Blogger Blog ID : ${config.blogger.blogId}`);
+    console.log(`========================================================\n`);
+  });
+
+  server.keepAliveTimeout = 120000;
+  server.headersTimeout = 120000;
+}
+
+startServer();
 
 module.exports = app;
