@@ -551,14 +551,13 @@ class UploadService {
       const imgExt = coverBase64.includes('image/webp') ? 'webp' : 'jpg';
       const imgMime = coverBase64.includes('image/webp') ? 'image/webp' : 'image/jpeg';
       const customCoverKey = `users/${pubUserId}/publications/${pubId}/cover.${imgExt}`;
-      const coverRes = await storageService.upload(customCoverKey, imgBuffer, imgMime);
-      coverUrl = coverRes.url;
+      await storageService.upload(customCoverKey, imgBuffer, imgMime);
     } else {
       const coverSvg = pdfService.generateVectorCoverSvg(pubTitle, pubCategory, pdfMeta.pageCount);
       const coverKey = `users/${pubUserId}/publications/${pubId}/cover.svg`;
-      const coverRes = await storageService.upload(coverKey, coverSvg, 'image/svg+xml');
-      coverUrl = coverRes.url;
+      await storageService.upload(coverKey, coverSvg, 'image/svg+xml');
     }
+    coverUrl = `/api/public/${pubId}/cover`;
 
     // Step 7: Password Hash if protected
     let passwordHash = null;

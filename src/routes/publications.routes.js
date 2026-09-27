@@ -391,14 +391,40 @@ router.get('/:id/pdf', optionalAuth, async (req, res) => {
 
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type, Accept');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges, ETag, Last-Modified');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Content-Disposition', `inline; filename="${publication.pdf_filename || 'document.pdf'}"`);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(publication.pdf_filename || 'document.pdf')}"`);
 
-    const buffer = await storageService.getBuffer(publication.storage_key);
-    res.setHeader('Content-Length', buffer.length);
-    return res.send(buffer);
+    const range = req.headers.range;
+    const streamResult = await storageService.getReadStream(publication.storage_key, range);
+
+    if (streamResult.eTag) res.setHeader('ETag', streamResult.eTag);
+    if (streamResult.lastModified) res.setHeader('Last-Modified', new Date(streamResult.lastModified).toUTCString());
+
+    if (req.method === 'HEAD') {
+      if (streamResult.contentLength) res.setHeader('Content-Length', streamResult.contentLength);
+      return res.status(200).end();
+    }
+
+    if (streamResult.isRange && streamResult.contentRange) {
+      res.setHeader('Content-Range', streamResult.contentRange);
+      res.setHeader('Content-Length', streamResult.contentLength);
+      res.status(206);
+    } else {
+      if (streamResult.contentLength) res.setHeader('Content-Length', streamResult.contentLength);
+      res.status(200);
+    }
+
+    streamResult.stream.on('error', (streamErr) => {
+      console.warn('[PDF ReadStream Error]', streamErr.message);
+      if (!res.headersSent) {
+        res.status(500).send('Error streaming PDF');
+      }
+    });
+
+    return streamResult.stream.pipe(res);
   } catch (err) {
     console.error('[PDF Stream Error]', err.message);
     const pub = db.getPublicationById(req.params.id);
