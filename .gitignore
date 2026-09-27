@@ -6,6 +6,7 @@ data/*.db
 data/*.db-journal
 data/*.db-wal
 data/*.db-shm
+data/*.json
 uploads/
 temp_chunks/
 *.log
@@ -13,3 +14,4 @@ temp_chunks/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
