@@ -86,17 +86,19 @@ const SYSTEM_ADMIN_ID = 'usr_system_admin';
 
 const masterAdminMemory = {
   id: SYSTEM_ADMIN_ID,
-  email: 'technews1562@gmail.com',
-  password_hash: '$2b$10$rW/1PMH0EdHVU/xmJPANXefL2tJi1QFy0e3MDLlzRFqV2bmcegnW6', // bcrypt for 'Admin@4916'
+  email: config.adminEmail || 'technews1562@gmail.com',
+  password_hash: config.adminPasswordHash || '$2b$10$rW/1PMH0EdHVU/xmJPANXefL2tJi1QFy0e3MDLlzRFqV2bmcegnW6', // bcrypt for 'Admin@4916'
   full_name: 'FlipView Master Admin',
   avatar_url: '',
   role: 'ADMIN',
+  status: 'ACTIVE',
   plan_id: 'business',
   storage_used_bytes: 0,
   publication_count: 0,
   created_at: new Date('2026-01-01T00:00:00.000Z').toISOString(),
   updated_at: new Date().toISOString()
 };
+
 
 let isR2InitialPullCompleted = false;
 
@@ -412,14 +414,25 @@ try {
       full_name TEXT,
       avatar_url TEXT,
       role TEXT DEFAULT 'USER',
+      status TEXT DEFAULT 'ACTIVE',
       plan_id TEXT DEFAULT 'free',
       storage_used_bytes INTEGER DEFAULT 0,
       publication_count INTEGER DEFAULT 0,
+      subscription_id TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY(plan_id) REFERENCES plans(id)
     );
   `);
+
+  // Safe schema migrations for existing users table
+  const existingUserCols = sqliteDb.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+  if (!existingUserCols.includes('status')) {
+    sqliteDb.exec("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'ACTIVE'");
+  }
+  if (!existingUserCols.includes('subscription_id')) {
+    sqliteDb.exec("ALTER TABLE users ADD COLUMN subscription_id TEXT");
+  }
 
   // 3. Sessions Table
   sqliteDb.exec(`
@@ -436,7 +449,7 @@ try {
     );
   `);
 
-  // 4. Upload Sessions Table (Phase 3 Modernized Uploads)
+  // 4. Upload Sessions Table (Canonical Upload System)
   sqliteDb.exec(`
     CREATE TABLE IF NOT EXISTS upload_sessions (
       id TEXT PRIMARY KEY,
@@ -449,6 +462,11 @@ try {
       total_chunks INTEGER NOT NULL,
       received_chunks INTEGER DEFAULT 0,
       file_hash TEXT,
+      title TEXT,
+      category TEXT,
+      description TEXT,
+      author TEXT,
+      visibility TEXT DEFAULT 'PUBLIC',
       status TEXT DEFAULT 'INITIATED',
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL,
@@ -456,6 +474,24 @@ try {
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);
+
+  // Safe schema migrations for existing upload_sessions table
+  const existingUploadCols = sqliteDb.prepare("PRAGMA table_info(upload_sessions)").all().map(c => c.name);
+  if (!existingUploadCols.includes('title')) {
+    sqliteDb.exec("ALTER TABLE upload_sessions ADD COLUMN title TEXT");
+  }
+  if (!existingUploadCols.includes('category')) {
+    sqliteDb.exec("ALTER TABLE upload_sessions ADD COLUMN category TEXT");
+  }
+  if (!existingUploadCols.includes('description')) {
+    sqliteDb.exec("ALTER TABLE upload_sessions ADD COLUMN description TEXT");
+  }
+  if (!existingUploadCols.includes('author')) {
+    sqliteDb.exec("ALTER TABLE upload_sessions ADD COLUMN author TEXT");
+  }
+  if (!existingUploadCols.includes('visibility')) {
+    sqliteDb.exec("ALTER TABLE upload_sessions ADD COLUMN visibility TEXT DEFAULT 'PUBLIC'");
+  }
 
   // 5. Publications Table
   sqliteDb.exec(`
@@ -554,14 +590,15 @@ try {
     insertPlanStmt.run(plan);
   }
 
-  // Seed / Upgrade Master Admin User (technews1562@gmail.com)
+  // Seed / Upgrade Master Admin User
   const masterAdminUser = {
     id: SYSTEM_ADMIN_ID,
-    email: 'technews1562@gmail.com',
-    password_hash: '$2b$10$rW/1PMH0EdHVU/xmJPANXefL2tJi1QFy0e3MDLlzRFqV2bmcegnW6', // bcrypt for 'Admin@4916'
+    email: config.adminEmail || 'technews1562@gmail.com',
+    password_hash: config.adminPasswordHash || '$2b$10$rW/1PMH0EdHVU/xmJPANXefL2tJi1QFy0e3MDLlzRFqV2bmcegnW6', // bcrypt for 'Admin@4916'
     full_name: 'FlipView Master Admin',
     avatar_url: '',
     role: 'ADMIN',
+    status: 'ACTIVE',
     plan_id: 'business',
     storage_used_bytes: 0,
     publication_count: 0,
@@ -569,28 +606,30 @@ try {
     updated_at: new Date().toISOString()
   };
 
-  const existingAdmin = sqliteDb.prepare("SELECT * FROM users WHERE email = ? OR id = ?").get('technews1562@gmail.com', SYSTEM_ADMIN_ID);
+  const existingAdmin = sqliteDb.prepare("SELECT * FROM users WHERE email = ? OR id = ?").get(masterAdminUser.email, SYSTEM_ADMIN_ID);
   if (existingAdmin) {
     sqliteDb.prepare(`
       UPDATE users SET
-        email = 'technews1562@gmail.com',
-        password_hash = '$2b$10$rW/1PMH0EdHVU/xmJPANXefL2tJi1QFy0e3MDLlzRFqV2bmcegnW6',
+        email = @email,
+        password_hash = @password_hash,
         role = 'ADMIN',
+        status = 'ACTIVE',
         plan_id = 'business',
-        updated_at = ?
-      WHERE id = ? OR email = 'technews1562@gmail.com'
-    `).run(new Date().toISOString(), existingAdmin.id);
+        updated_at = @updated_at
+      WHERE id = @id OR email = @email
+    `).run(masterAdminUser);
   } else {
     sqliteDb.prepare(`
       INSERT INTO users (
-        id, email, password_hash, full_name, avatar_url, role,
+        id, email, password_hash, full_name, avatar_url, role, status,
         plan_id, storage_used_bytes, publication_count, created_at, updated_at
       ) VALUES (
-        @id, @email, @password_hash, @full_name, @avatar_url, @role,
+        @id, @email, @password_hash, @full_name, @avatar_url, @role, @status,
         @plan_id, @storage_used_bytes, @publication_count, @created_at, @updated_at
       )
     `).run(masterAdminUser);
   }
+
 
   // Assign any publications without user_id to SYSTEM_ADMIN_ID
   sqliteDb.prepare(`UPDATE publications SET user_id = ? WHERE user_id IS NULL OR user_id = ''`).run(SYSTEM_ADMIN_ID);
@@ -1005,7 +1044,7 @@ module.exports = {
   },
 
   // -------------------------------------------------------------
-  // UPLOAD SESSIONS METHODS (Phase 3)
+  // UPLOAD SESSIONS METHODS (Canonical Upload System)
   // -------------------------------------------------------------
   createUploadSession(sessionData) {
     const now = new Date().toISOString();
@@ -1020,6 +1059,11 @@ module.exports = {
       total_chunks: parseInt(sessionData.total_chunks, 10) || 1,
       received_chunks: parseInt(sessionData.received_chunks, 10) || 0,
       file_hash: sessionData.file_hash || null,
+      title: sessionData.title || '',
+      category: sessionData.category || 'Magazine',
+      description: sessionData.description || '',
+      author: sessionData.author || '',
+      visibility: sessionData.visibility || 'PUBLIC',
       status: sessionData.status || 'INITIATED',
       expires_at: sessionData.expires_at,
       created_at: sessionData.created_at || now,
@@ -1032,11 +1076,13 @@ module.exports = {
           INSERT INTO upload_sessions (
             id, user_id, publication_id, filename, content_type,
             expected_size, received_size, total_chunks, received_chunks,
-            file_hash, status, expires_at, created_at, updated_at
+            file_hash, title, category, description, author, visibility,
+            status, expires_at, created_at, updated_at
           ) VALUES (
             @id, @user_id, @publication_id, @filename, @content_type,
             @expected_size, @received_size, @total_chunks, @received_chunks,
-            @file_hash, @status, @expires_at, @created_at, @updated_at
+            @file_hash, @title, @category, @description, @author, @visibility,
+            @status, @expires_at, @created_at, @updated_at
           )
         `).run(session);
       } catch (e) {
@@ -1081,6 +1127,11 @@ module.exports = {
             received_size = @received_size,
             received_chunks = @received_chunks,
             file_hash = @file_hash,
+            title = @title,
+            category = @category,
+            description = @description,
+            author = @author,
+            visibility = @visibility,
             status = @status,
             expires_at = @expires_at,
             updated_at = @updated_at
@@ -1088,6 +1139,7 @@ module.exports = {
         `).run(merged);
       } catch (e) {}
     }
+
 
     const idx = uploadSessionsStore.findIndex(s => s.id === id);
     if (idx >= 0) uploadSessionsStore[idx] = merged;

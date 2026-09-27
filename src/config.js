@@ -38,22 +38,24 @@ module.exports = {
     postEmail: process.env.BLOGGER_POST_EMAIL || '',
     smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
     smtpPort: parseInt(process.env.SMTP_PORT, 10) || 587,
-    smtpUser: process.env.SMTP_USER || 'technews1562@gmail.com',
-    smtpPass: process.env.SMTP_PASS || 'unxkuzpunhknpadt'
+    smtpUser: process.env.SMTP_USER || '',
+    smtpPass: process.env.SMTP_PASS || ''
   },
 
   // Email Notification Settings
   email: {
     smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
     smtpPort: parseInt(process.env.SMTP_PORT, 10) || 587,
-    smtpUser: process.env.SMTP_USER || 'technews1562@gmail.com',
-    smtpPass: process.env.SMTP_PASS || 'unxkuzpunhknpadt',
+    smtpUser: process.env.SMTP_USER || '',
+    smtpPass: process.env.SMTP_PASS || '',
     resendApiKey: process.env.RESEND_API_KEY || '',
-    fromAddress: process.env.EMAIL_FROM || '"FlipView" <technews1562@gmail.com>'
+    fromAddress: process.env.EMAIL_FROM || '"FlipView" <no-reply@flipviewpdf.com>'
   },
 
   // Admin Security
-  adminApiKey: process.env.ADMIN_API_KEY || 'flipview-admin-secret-key',
+  adminApiKey: process.env.ADMIN_API_KEY || '',
+  adminEmail: process.env.ADMIN_EMAIL || 'technews1562@gmail.com',
+  adminPasswordHash: process.env.ADMIN_PASSWORD_HASH || '$2b$10$rW/1PMH0EdHVU/xmJPANXefL2tJi1QFy0e3MDLlzRFqV2bmcegnW6',
 
   // JWT Authentication
   jwt: {
@@ -76,3 +78,4 @@ module.exports = {
     token: process.env.GITHUB_TOKEN || ''
   }
 };
+

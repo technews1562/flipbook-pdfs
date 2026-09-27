@@ -4,12 +4,11 @@ const multer = require('multer');
 const rateLimit = require('express-rate-limit');
 const uploadService = require('../services/upload/upload.service');
 const { requireAuth } = require('../middleware/auth');
-const db = require('../db/database');
 
 // Configure Multer for 2MB chunk streaming
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB safety margin per individual chunk request
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB safety margin per individual chunk request
 });
 
 // Rate Limiter for Upload Init & Complete (prevents spam session creation)
@@ -32,14 +31,31 @@ const uploadInitLimiter = rateLimit({
 // -------------------------------------------------------------
 router.post('/init', requireAuth, uploadInitLimiter, async (req, res) => {
   try {
-    const { filename, fileSize, contentType, totalChunks } = req.body;
+    const {
+      filename,
+      fileSize,
+      contentType,
+      totalChunks,
+      fileHash,
+      title,
+      category,
+      description,
+      author,
+      visibility
+    } = req.body;
 
     const result = await uploadService.initUpload({
       userId: req.user.id,
       filename,
       fileSize,
       contentType,
-      totalChunks
+      totalChunks,
+      fileHash,
+      title,
+      category,
+      description,
+      author,
+      visibility
     });
 
     return res.status(201).json({
@@ -104,7 +120,7 @@ router.post('/chunk', requireAuth, upload.single('chunk'), async (req, res) => {
 // -------------------------------------------------------------
 router.post('/complete', requireAuth, uploadInitLimiter, async (req, res) => {
   try {
-    const { uploadId, title, category, description, author, coverBase64, visibility } = req.body;
+    const { uploadId, title, category, description, author, coverBase64, visibility, password } = req.body;
 
     const result = await uploadService.completeUpload({
       userId: req.user.id,
@@ -114,7 +130,8 @@ router.post('/complete', requireAuth, uploadInitLimiter, async (req, res) => {
       description,
       author,
       coverBase64,
-      visibility
+      visibility,
+      password
     });
 
     return res.status(200).json({
@@ -134,35 +151,28 @@ router.post('/complete', requireAuth, uploadInitLimiter, async (req, res) => {
 });
 
 // -------------------------------------------------------------
-// GET /api/uploads/:id (Check Upload Session Status)
+// GET /api/uploads/:id (Resume API: Check Upload Status & Chunks)
 // -------------------------------------------------------------
-router.get('/:id', requireAuth, (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const session = db.getUploadSessionById(id);
+    const isAdmin = req.user.role === 'ADMIN';
 
-    if (!session) {
-      return res.status(404).json({
-        success: false,
-        error: { code: 'UPLOAD_NOT_FOUND', message: 'Upload session not found.' }
-      });
-    }
-
-    if (session.user_id !== req.user.id && req.user.role !== 'ADMIN') {
-      return res.status(403).json({
-        success: false,
-        error: { code: 'FORBIDDEN', message: 'You do not have permission to view this upload session.' }
-      });
-    }
+    const result = await uploadService.getUploadStatus({
+      userId: req.user.id,
+      uploadId: id,
+      isAdmin
+    });
 
     return res.status(200).json({
       success: true,
-      data: session
+      data: result
     });
   } catch (err) {
-    return res.status(500).json({
+    const status = err.status || 500;
+    return res.status(status).json({
       success: false,
-      error: { code: 'FETCH_FAILED', message: err.message }
+      error: { code: err.code || 'FETCH_FAILED', message: err.message }
     });
   }
 });

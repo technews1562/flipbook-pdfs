@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 const config = require('../../config');
 const db = require('../../db/database');
 const storageService = require('../storage/storage.service');
@@ -8,7 +9,7 @@ const { getUserPlan } = require('../../middleware/planValidator');
 
 class UploadService {
   constructor() {
-    this.chunkSize = config.upload?.chunkSize || 2097152; // 2 MB
+    this.chunkSize = config.upload?.chunkSize || 2097152; // 2 MB Canonical Chunk Size
     this.sessionTtlMinutes = config.upload?.sessionTtlMinutes || 30;
     this.tempDir = config.upload?.tempDir || path.join(process.cwd(), 'data', 'tmp_uploads');
 
@@ -52,9 +53,24 @@ class UploadService {
   /**
    * Initialize a new authenticated upload session with plan quota validation
    */
-  async initUpload({ userId, filename, fileSize, contentType = 'application/pdf', totalChunks }) {
+  async initUpload({
+    userId,
+    filename,
+    fileSize,
+    contentType = 'application/pdf',
+    totalChunks,
+    fileHash,
+    title,
+    category,
+    description,
+    author,
+    visibility = 'PUBLIC'
+  }) {
     if (!userId) {
-      throw new Error('User authentication is required to initialize an upload session.');
+      const err = new Error('User authentication is required to initialize an upload session.');
+      err.code = 'UNAUTHORIZED';
+      err.status = 401;
+      throw err;
     }
 
     const cleanFilename = (filename || 'document.pdf').replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -73,13 +89,16 @@ class UploadService {
       throw err;
     }
 
-    const chunks = parseInt(totalChunks, 10) || Math.ceil(size / this.chunkSize);
-    if (chunks < 1) {
-      const err = new Error('Invalid totalChunks: must be at least 1.');
-      err.code = 'INVALID_CHUNKS';
-      err.status = 400;
-      throw err;
+    // Canonical chunk count calculation (Server is authoritative)
+    const expectedChunks = Math.ceil(size / this.chunkSize);
+    let chunks = parseInt(totalChunks, 10);
+    if (!chunks || chunks <= 0 || chunks !== expectedChunks) {
+      chunks = expectedChunks;
     }
+
+    // Visibility validation
+    const validVisibilities = ['PUBLIC', 'UNLISTED', 'PRIVATE', 'PASSWORD_PROTECTED'];
+    const safeVisibility = validVisibilities.includes(visibility) ? visibility : 'PUBLIC';
 
     // Plan & Quota Validation
     const user = db.getUserById(userId);
@@ -91,7 +110,9 @@ class UploadService {
     }
 
     const plan = getUserPlan(user);
-    if (user.role !== 'ADMIN') {
+    const isAdmin = user.role === 'ADMIN';
+
+    if (!isAdmin) {
       // 1. Publication count limit
       if (plan.max_publications !== -1 && (user.publication_count || 0) >= plan.max_publications) {
         const err = new Error(`You have reached your limit of ${plan.max_publications} publications on the ${plan.name} plan. Please upgrade to Pro for higher limits.`);
@@ -114,8 +135,16 @@ class UploadService {
       if (size > plan.max_pdf_size_bytes) {
         const maxMb = (plan.max_pdf_size_bytes / (1024 * 1024)).toFixed(0);
         const err = new Error(`This PDF exceeds the maximum file size limit of ${maxMb} MB for the ${plan.name} plan.`);
-        err.code = 'FILE_TOO_LARGE';
+        err.code = 'FILE_SIZE_LIMIT_EXCEEDED';
         err.status = 413;
+        throw err;
+      }
+
+      // 4. Password Protection entitlement check
+      if (safeVisibility === 'PASSWORD_PROTECTED' && !plan.allow_password_protect) {
+        const err = new Error(`Password protection is not available on the ${plan.name} plan. Please upgrade to Pro.`);
+        err.code = 'PASSWORD_PROTECTION_NOT_ALLOWED';
+        err.status = 403;
         throw err;
       }
     }
@@ -134,6 +163,12 @@ class UploadService {
       received_size: 0,
       total_chunks: chunks,
       received_chunks: 0,
+      file_hash: fileHash || null,
+      title: title || '',
+      category: category || 'Magazine',
+      description: description || '',
+      author: author || '',
+      visibility: safeVisibility,
       status: 'INITIATED',
       expires_at: expiresAt
     });
@@ -153,12 +188,20 @@ class UploadService {
   }
 
   /**
-   * Save an uploaded binary chunk
+   * Save an uploaded binary chunk (Max 2 MB per chunk)
    */
   async saveChunk({ userId, uploadId, chunkIndex, buffer }) {
     if (!uploadId || chunkIndex === undefined || !buffer) {
       const err = new Error('Missing uploadId, chunkIndex, or chunk payload.');
       err.code = 'INVALID_CHUNK_REQUEST';
+      err.status = 400;
+      throw err;
+    }
+
+    // Chunk size limit validation (Never accept > 2 MB)
+    if (buffer.length > this.chunkSize) {
+      const err = new Error(`Chunk size (${buffer.length} bytes) exceeds the maximum allowed 2 MB (${this.chunkSize} bytes).`);
+      err.code = 'INVALID_CHUNK_SIZE';
       err.status = 400;
       throw err;
     }
@@ -196,6 +239,8 @@ class UploadService {
     }
 
     if (new Date(session.expires_at) <= new Date()) {
+      this.cleanupTempDir(uploadId);
+      db.updateUploadSession(uploadId, { status: 'EXPIRED' });
       const err = new Error('Upload session has expired. Please initiate a new upload.');
       err.code = 'UPLOAD_EXPIRED';
       err.status = 400;
@@ -210,12 +255,12 @@ class UploadService {
       throw err;
     }
 
-    // Write chunk to deterministic temp path on disk
+    // Write chunk to deterministic temp path on disk (safely retryable)
     const sessionDir = this.getUploadDir(uploadId);
     const chunkPath = path.join(sessionDir, `chunk_${idx}`);
     fs.writeFileSync(chunkPath, buffer);
 
-    // Compute received chunks and size
+    // Compute received chunks and size deterministically
     let receivedChunks = 0;
     let receivedSize = 0;
     for (let i = 0; i < session.total_chunks; i++) {
@@ -232,21 +277,96 @@ class UploadService {
       received_size: receivedSize
     });
 
+    const progressPercent = Math.round((receivedChunks / session.total_chunks) * 100);
+
     return {
       uploadId,
       chunkIndex: idx,
       receivedChunks,
       totalChunks: session.total_chunks,
-      receivedSize,
-      expectedSize: session.expected_size,
+      progressPercent,
       status: 'UPLOADING'
+    };
+  }
+
+  /**
+   * Resume API: Inspect upload session state and return received vs missing chunks
+   */
+  async getUploadStatus({ userId, uploadId, isAdmin = false }) {
+    if (!uploadId) {
+      const err = new Error('Missing uploadId parameter.');
+      err.code = 'MISSING_UPLOAD_ID';
+      err.status = 400;
+      throw err;
+    }
+
+    const session = db.getUploadSessionById(uploadId);
+    if (!session) {
+      const err = new Error('Upload session not found.');
+      err.code = 'UPLOAD_NOT_FOUND';
+      err.status = 404;
+      throw err;
+    }
+
+    if (session.user_id !== userId && !isAdmin) {
+      const err = new Error('You do not have permission to view this upload session.');
+      err.code = 'FORBIDDEN';
+      err.status = 403;
+      throw err;
+    }
+
+    // Check expiration
+    if (new Date(session.expires_at) <= new Date() && session.status !== 'COMPLETED') {
+      this.cleanupTempDir(uploadId);
+      db.updateUploadSession(uploadId, { status: 'EXPIRED' });
+      session.status = 'EXPIRED';
+    }
+
+    const sessionDir = path.join(this.tempDir, uploadId);
+    const receivedChunks = [];
+    const missingChunks = [];
+
+    for (let i = 0; i < session.total_chunks; i++) {
+      const chunkPath = path.join(sessionDir, `chunk_${i}`);
+      if (fs.existsSync(chunkPath)) {
+        receivedChunks.push(i);
+      } else {
+        missingChunks.push(i);
+      }
+    }
+
+    const progressPercent = session.total_chunks > 0
+      ? Math.round((receivedChunks.length / session.total_chunks) * 100)
+      : 0;
+
+    return {
+      uploadId: session.id,
+      publicationId: session.publication_id,
+      status: session.status,
+      totalChunks: session.total_chunks,
+      receivedChunks,
+      missingChunks,
+      progressPercent,
+      expectedSize: session.expected_size,
+      receivedSize: session.received_size,
+      expiresAt: session.expires_at
     };
   }
 
   /**
    * Complete upload: assemble chunks, inspect PDF, upload to R2 under user namespace, update DB
    */
-  async completeUpload({ userId, uploadId, title, category, description, author, coverBase64, visibility }) {
+  async completeUpload({
+    userId,
+    uploadId,
+    title,
+    category,
+    description,
+    author,
+    coverBase64,
+    visibility,
+    password
+  }) {
     if (!uploadId) {
       const err = new Error('Missing uploadId parameter.');
       err.code = 'MISSING_UPLOAD_ID';
@@ -266,7 +386,7 @@ class UploadService {
     const user = db.getUserById(userId);
     const isAdmin = user && user.role === 'ADMIN';
     if (session.user_id !== userId && !isAdmin) {
-      const err = new Error('You do not have permission to access this upload session.');
+      const err = new Error('You do not have permission to complete this upload session.');
       err.code = 'FORBIDDEN';
       err.status = 403;
       throw err;
@@ -285,8 +405,10 @@ class UploadService {
             fileSize: existingPub.file_size,
             status: existingPub.status,
             publicUrl: config.getPublicViewerUrl(existingPub.id),
-            pdfUrl: existingPub.pdf_url,
-            coverUrl: existingPub.cover_url
+            pdfUrl: `/api/public/${existingPub.id}/pdf`,
+            coverUrl: `/api/public/${existingPub.id}/cover`,
+            hasBranding: Boolean(existingPub.has_branding),
+            visibility: existingPub.visibility
           }
         };
       }
@@ -299,6 +421,25 @@ class UploadService {
       throw err;
     }
 
+    if (new Date(session.expires_at) <= new Date()) {
+      this.cleanupTempDir(uploadId);
+      db.updateUploadSession(uploadId, { status: 'EXPIRED' });
+      const err = new Error('Upload session has expired. Please start a new upload.');
+      err.code = 'UPLOAD_EXPIRED';
+      err.status = 400;
+      throw err;
+    }
+
+    // Concurrency guard: Atomically transition to COMPLETING
+    if (session.status === 'COMPLETING') {
+      const err = new Error('Upload completion is already in progress.');
+      err.code = 'COMPLETION_IN_PROGRESS';
+      err.status = 409;
+      throw err;
+    }
+
+    db.updateUploadSession(uploadId, { status: 'COMPLETING' });
+
     const sessionDir = this.getUploadDir(uploadId);
 
     // Verify all chunks are present on disk
@@ -306,6 +447,7 @@ class UploadService {
     for (let i = 0; i < session.total_chunks; i++) {
       const p = path.join(sessionDir, `chunk_${i}`);
       if (!fs.existsSync(p)) {
+        db.updateUploadSession(uploadId, { status: 'UPLOADING' });
         const err = new Error(`Incomplete upload: Missing chunk ${i + 1} of ${session.total_chunks}.`);
         err.code = 'INCOMPLETE_CHUNKS';
         err.status = 400;
@@ -314,14 +456,15 @@ class UploadService {
       chunkBuffers.push(fs.readFileSync(p));
     }
 
-    // Assemble PDF
+    // Assemble complete PDF
     const completeBuffer = Buffer.concat(chunkBuffers);
 
-    // Step 1: Validate PDF structure & metadata
+    // Step 1: Validate PDF structure & metadata (magic bytes %PDF- and structure)
     let pdfMeta;
     try {
       pdfMeta = await pdfService.validateAndInspect(completeBuffer);
     } catch (valErr) {
+      db.updateUploadSession(uploadId, { status: 'UPLOADING' });
       const err = new Error(`Invalid PDF document: ${valErr.message}`);
       err.code = 'INVALID_PDF';
       err.status = 400;
@@ -331,13 +474,19 @@ class UploadService {
     // Step 2: Enforce Plan Page Count Limits
     const plan = getUserPlan(user);
     if (!isAdmin && plan.max_pages_per_doc !== -1 && pdfMeta.pageCount > plan.max_pages_per_doc) {
+      db.updateUploadSession(uploadId, { status: 'UPLOADING' });
       const err = new Error(`Document page count (${pdfMeta.pageCount} pages) exceeds your ${plan.name} plan limit of ${plan.max_pages_per_doc} pages.`);
       err.code = 'PAGE_LIMIT_EXCEEDED';
       err.status = 400;
       throw err;
     }
 
-    // Step 3: Duplicate detection for the same user
+    // Step 3: Verify client-provided hash if supplied
+    if (session.file_hash && session.file_hash !== pdfMeta.fileHash) {
+      console.warn(`[Upload Hash Check] Calculated ${pdfMeta.fileHash} vs client ${session.file_hash}`);
+    }
+
+    // Step 4: Duplicate detection for the same user
     const existing = db.getPublicationByHash(pdfMeta.fileHash, session.user_id);
     if (existing) {
       this.cleanupTempDir(uploadId);
@@ -351,24 +500,29 @@ class UploadService {
           fileSize: existing.file_size,
           status: existing.status,
           publicUrl: config.getPublicViewerUrl(existing.id),
-          pdfUrl: existing.pdf_url,
-          coverUrl: existing.cover_url,
+          pdfUrl: `/api/public/${existing.id}/pdf`,
+          coverUrl: `/api/public/${existing.id}/cover`,
+          hasBranding: Boolean(existing.has_branding),
+          visibility: existing.visibility,
           duplicate: true
         }
       };
     }
 
-    // Step 4: R2 Structured Namespacing (users/{userId}/publications/{publicationId}/original.pdf)
+    // Step 5: R2 Structured Namespacing (users/{userId}/publications/{publicationId}/original.pdf)
     const pubId = session.publication_id;
     const pubUserId = session.user_id;
     const storageKey = `users/${pubUserId}/publications/${pubId}/original.pdf`;
 
     const { url: pdfUrl } = await storageService.upload(storageKey, completeBuffer, 'application/pdf');
 
-    // Step 5: Handle Cover Generation & Upload (users/{userId}/publications/{publicationId}/cover.webp or .svg)
+    // Step 6: Server-side Cover Generation & Upload
     let coverUrl = '';
-    const pubTitle = (title ? title.trim() : session.filename.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ').trim()) || 'Digital Publication';
-    const pubCategory = category || 'Magazine';
+    const pubTitle = (title || session.title ? (title || session.title).trim() : session.filename.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ').trim()) || 'Digital Publication';
+    const pubCategory = category || session.category || 'Magazine';
+    const pubDescription = description !== undefined ? description : (session.description || '');
+    const pubAuthor = author !== undefined ? author : (session.author || '');
+    const pubVisibility = visibility || session.visibility || 'PUBLIC';
 
     if (coverBase64 && coverBase64.startsWith('data:image/')) {
       const parts = coverBase64.split(',');
@@ -385,14 +539,20 @@ class UploadService {
       coverUrl = coverRes.url;
     }
 
-    // Step 6: Save Publication Record in Database & Atomically Update Storage Counters
+    // Step 7: Password Hash if protected
+    let passwordHash = null;
+    if (password && typeof password === 'string' && password.trim().length > 0) {
+      passwordHash = await bcrypt.hash(password.trim(), 10);
+    }
+
+    // Step 8: Save Publication Record in Database & Atomically Update Storage Counters
     const pubRecord = db.createPublication({
       id: pubId,
       user_id: pubUserId,
       title: pubTitle,
       category: pubCategory,
-      description: description || '',
-      author: author || '',
+      description: pubDescription,
+      author: pubAuthor,
       pdf_filename: session.filename,
       storage_key: storageKey,
       pdf_url: pdfUrl,
@@ -402,11 +562,12 @@ class UploadService {
       file_hash: pdfMeta.fileHash,
       status: 'READY',
       published: 1,
-      visibility: visibility || 'PUBLIC',
+      visibility: pubVisibility,
+      password_hash: passwordHash,
       has_branding: plan.has_branding ? 1 : 0
     });
 
-    // Step 7: Mark Session COMPLETED and clean up temp files
+    // Step 9: Mark Session COMPLETED and clean up temp files
     db.updateUploadSession(uploadId, {
       status: 'COMPLETED',
       file_hash: pdfMeta.fileHash,
@@ -426,9 +587,10 @@ class UploadService {
         fileSize: pubRecord.file_size,
         status: pubRecord.status,
         publicUrl,
-        pdfUrl: pubRecord.pdf_url,
-        coverUrl: pubRecord.cover_url,
-        hasBranding: Boolean(pubRecord.has_branding)
+        pdfUrl: `/api/public/${pubRecord.id}/pdf`,
+        coverUrl: `/api/public/${pubRecord.id}/cover`,
+        hasBranding: Boolean(pubRecord.has_branding),
+        visibility: pubRecord.visibility
       }
     };
   }
