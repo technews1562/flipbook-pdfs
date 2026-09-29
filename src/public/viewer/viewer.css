@@ -313,65 +313,124 @@ a {
 }
 
 .fv-book-container {
+  box-shadow: none !important;
+  border-radius: 4px;
+  overflow: visible !important;
+  background: transparent !important;
+  margin: 0 auto;
+  transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
   display: block !important;
   position: relative !important;
-  margin: 0 auto !important;
-  transform-origin: center center;
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  background: transparent !important;
-  box-shadow: none !important;
-  border: none !important;
 }
 
 /* StPageFlip Internal Layout Structure Fixes */
-.stf__parent {
-  position: relative !important;
-  display: block !important;
-  box-sizing: border-box !important;
-  transform: translateZ(0);
-  -ms-touch-action: pan-y;
-  touch-action: pan-y;
-  margin: 0 auto !important;
-}
-
-.stf__wrapper {
-  position: relative !important;
-  width: 100% !important;
-  height: 100% !important;
-  box-sizing: border-box !important;
-}
-
+.stf__parent,
+.stf__wrapper,
+.stf__container,
 .stf__block {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  box-sizing: border-box !important;
-  perspective: 2000px;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
 }
 
 .stf__item {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  transform-style: preserve-3d;
-  box-sizing: border-box !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.stf__item:empty {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* Realistic 3D Spine Crease Gradient on Left and Right Pages */
 .st-page {
   background-color: #ffffff;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22), 0 4px 14px rgba(15, 23, 42, 0.1) !important;
   overflow: hidden;
-  position: absolute !important;
-  top: 0;
-  left: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  position: relative;
+  border-radius: 2px;
   width: 100%;
   height: 100%;
-  box-shadow: var(--fv-shadow-book);
-  opacity: 1 !important;
-  visibility: visible !important;
   box-sizing: border-box !important;
+}
+
+/* Authentic 3D Center Crease & Book Spine Shading */
+.stf__item.--left .st-page::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 48px;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0.08) 40%, rgba(0, 0, 0, 0.01) 75%, transparent 100%);
+  pointer-events: none;
+  z-index: 15;
+}
+
+.stf__item.--left .st-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 2px;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: -1px 0 3px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  z-index: 16;
+}
+
+.stf__item.--right .st-page::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 48px;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0.08) 40%, rgba(0, 0, 0, 0.01) 75%, transparent 100%);
+  pointer-events: none;
+  z-index: 15;
+}
+
+.stf__item.--right .st-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: 1px 0 3px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  z-index: 16;
+}
+
+.fv-book-container.hz-at-cover .st-page::after,
+.fv-book-container.hz-at-cover .st-page::before,
+.fv-book-container.hz-at-back .st-page::after,
+.fv-book-container.hz-at-back .st-page::before {
+  display: none !important;
+}
+
+.fv-book-container.hz-at-cover .st-page.--left,
+.fv-book-container.hz-at-cover .stf__item.--left {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.fv-book-container.hz-at-back .st-page.--right,
+.fv-book-container.hz-at-back .stf__item.--right {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* PDF Interactive Annotations & Hyperlinks Overlay Layer */
@@ -414,32 +473,11 @@ a {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: contain;
+  object-fit: fill;
   opacity: 1 !important;
   visibility: visible !important;
   backface-visibility: visible !important;
   -webkit-backface-visibility: visible !important;
-}
-
-/* Spine Shadow on Inside Edge */
-.st-page[data-density="soft"]:before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 32px;
-  z-index: 5;
-  pointer-events: none;
-}
-
-.st-page.--right[data-density="soft"]:before {
-  left: 0;
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.16) 0%, rgba(0, 0, 0, 0.03) 30%, transparent 100%);
-}
-
-.st-page.--left[data-density="soft"]:before {
-  right: 0;
-  background: linear-gradient(to left, rgba(0, 0, 0, 0.16) 0%, rgba(0, 0, 0, 0.03) 30%, transparent 100%);
 }
 
 /* Side Navigation Arrows (Heyzine Floating Paddles) */

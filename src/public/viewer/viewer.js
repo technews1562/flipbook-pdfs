@@ -606,34 +606,76 @@
   }
 
   // --- Calculate Dimensions & Centering ---
-  function getBookSpreadTransform(idx, numPages, isMobile) {
-    if (isMobile) {
-      return `translateX(0)`;
+  function hzCalcDimensions(docWidth, docHeight) {
+    const sW = window.innerWidth;
+    const isMob = sW <= 768;
+    const sH = window.innerHeight - (isMob ? 100 : 130);
+    const isSingle = (cachedPages.length === 1);
+
+    let sWidth, sHeight;
+    if (isSingle || isMob) {
+      const availW = isMob ? Math.floor(sW * 0.94) : Math.floor(sW * 0.65);
+      const availH = Math.floor(sH * 0.92);
+      const docRatio = docWidth / docHeight;
+      if (availW / availH > docRatio) {
+        sHeight = availH;
+        sWidth = Math.round(sHeight * docRatio);
+      } else {
+        sWidth = availW;
+        sHeight = Math.round(sWidth / docRatio);
+      }
+    } else {
+      const spreadRatio = (2 * docWidth) / docHeight;
+      const availW = Math.floor(sW * 0.90);
+      const availH = Math.floor(sH * 0.92);
+      let spreadW, spreadH;
+      if (availW / availH > spreadRatio) {
+        spreadH = availH;
+        spreadW = Math.round(spreadH * spreadRatio);
+      } else {
+        spreadW = availW;
+        spreadH = Math.round(spreadW / spreadRatio);
+      }
+      sWidth = Math.round(spreadW / 2);
+      sHeight = spreadH;
     }
-    if (idx === 0) {
-      return `translateX(-25%)`;
-    }
-    if (idx === numPages - 1) {
-      return `translateX(25%)`;
-    }
-    return `translateX(0)`;
+    return { width: sWidth, height: sHeight, isMobile: isMob, isSinglePage: isSingle };
   }
 
-  function updateContainerTransform() {
+  function updateContainerTransform(idx = null) {
     if (!el.bookContainer || !currentActivePageFlip) return;
-    const idx = currentActivePageFlip.getCurrentPageIndex();
+    const curIdx = idx !== null ? idx : currentActivePageFlip.getCurrentPageIndex();
     const numPages = cachedPages.length;
     const isMobile = window.innerWidth <= 768;
+    const isSinglePage = numPages === 1;
 
-    const spreadOffset = getBookSpreadTransform(idx, numPages, isMobile);
+    let baseTransform = 'translateX(0)';
+
+    if (isSinglePage || isMobile) {
+      el.bookContainer.classList.remove('hz-at-cover', 'hz-at-back');
+      baseTransform = 'translateX(0)';
+    } else {
+      if (curIdx === 0) {
+        el.bookContainer.classList.add('hz-at-cover');
+        el.bookContainer.classList.remove('hz-at-back');
+        baseTransform = 'translateX(-25%)';
+      } else if (curIdx >= numPages - 1) {
+        el.bookContainer.classList.add('hz-at-back');
+        el.bookContainer.classList.remove('hz-at-cover');
+        baseTransform = 'translateX(25%)';
+      } else {
+        el.bookContainer.classList.remove('hz-at-cover', 'hz-at-back');
+        baseTransform = 'translateX(0)';
+      }
+    }
 
     if (currentZoom > 1.02) {
       el.bookContainer.classList.add('is-zoomed');
-      el.bookContainer.style.transform = `translate3d(${panX}px, ${panY}px, 0px) scale(${currentZoom}) ${spreadOffset}`;
+      el.bookContainer.style.transform = `translate3d(${panX}px, ${panY}px, 0px) scale(${currentZoom}) ${baseTransform}`;
     } else {
       el.bookContainer.classList.remove('is-zoomed');
       el.bookContainer.classList.remove('is-panning');
-      el.bookContainer.style.transform = `scale(1) ${spreadOffset}`;
+      el.bookContainer.style.transform = baseTransform;
     }
   }
 
@@ -778,16 +820,12 @@
     el.bookContainer = container;
     container.innerHTML = '';
 
-    // Create fresh DOM elements and canvas copies for StPageFlip to own
+    // Create DOM elements for pages
     cachedPages.forEach((p, idx) => {
       const pDiv = document.createElement('div');
       pDiv.className = 'st-page';
       pDiv.setAttribute('data-density', p.density);
-      if (idx % 2 === 0) {
-        pDiv.classList.add('--right');
-      } else {
-        pDiv.classList.add('--left');
-      }
+      pDiv.setAttribute('data-page-num', p.pageNumber);
 
       const freshCanvas = document.createElement('canvas');
       freshCanvas.width = p.width;
@@ -800,61 +838,38 @@
       container.appendChild(pDiv);
     });
 
+    // Add back cover pad if odd page count in spread mode
+    if (numPages > 1 && numPages % 2 !== 0) {
+      const backCoverDiv = document.createElement('div');
+      backCoverDiv.className = 'st-page';
+      backCoverDiv.setAttribute('data-density', 'hard');
+      backCoverDiv.style.background = '#f8fafc';
+      container.appendChild(backCoverDiv);
+    }
+
     const firstMaster = cachedPages[0].masterCanvas;
     const canvasW = firstMaster ? firstMaster.width : 600;
     const canvasH = firstMaster ? firstMaster.height : 850;
-    const pageRatio = canvasH / canvasW;
 
-    const stageW = window.innerWidth;
-    const stageH = window.innerHeight - (stageW <= 768 ? 110 : 130);
-    const isMobile = stageW <= 768;
-
-    let singleW, singleH;
-
-    if (!isMobile) {
-      // Desktop Two-Page Spread
-      const maxPairWidth = stageW * 0.84;
-      const maxHeight = stageH * 0.90;
-      const maxSingleWidth = maxPairWidth / 2;
-      const heightFromWidth = maxSingleWidth * pageRatio;
-
-      if (heightFromWidth <= maxHeight) {
-        singleW = Math.round(maxSingleWidth);
-        singleH = Math.round(heightFromWidth);
-      } else {
-        singleH = Math.round(maxHeight);
-        singleW = Math.round(singleH / pageRatio);
-      }
-    } else {
-      // Mobile Single Page Portrait
-      const maxWidth = stageW * 0.92;
-      const maxHeight = stageH * 0.88;
-      const heightFromWidth = maxWidth * pageRatio;
-
-      if (heightFromWidth <= maxHeight) {
-        singleW = Math.round(maxWidth);
-        singleH = Math.round(heightFromWidth);
-      } else {
-        singleH = Math.round(maxHeight);
-        singleW = Math.round(singleH / pageRatio);
-      }
-    }
+    const dims = hzCalcDimensions(canvasW, canvasH);
+    const isMobile = dims.isMobile;
+    const isSinglePage = dims.isSinglePage;
 
     const pageFlip = new St.PageFlip(container, {
-      width: singleW,
-      height: singleH,
+      width: dims.width,
+      height: dims.height,
       size: 'fixed',
-      minWidth: 180,
-      maxWidth: 1600,
-      minHeight: 260,
-      maxHeight: 1800,
-      maxShadowOpacity: 0.30,
-      showCover: true,
+      minWidth: Math.round(dims.width * 0.5),
+      maxWidth: Math.round(dims.width * 1.5),
+      minHeight: Math.round(dims.height * 0.5),
+      maxHeight: Math.round(dims.height * 1.5),
+      maxShadowOpacity: 0.35,
+      showCover: !isSinglePage && !isMobile,
       mobileScrollSupport: false,
-      usePortrait: isMobile,
-      startPage: startPageIndex,
+      usePortrait: isMobile || isSinglePage,
+      startPage: safeStartPage,
       drawShadow: true,
-      flippingTime: 650, // Crisp natural Heyzine paper turn timing
+      flippingTime: 600,
       useMouseEvents: true,
       swipeDistance: 25,
       showPageCorners: true
@@ -868,10 +883,10 @@
       const pageIdx = idx + 1;
       if (el.scrubber) el.scrubber.value = pageIdx;
 
-      if (!isMobile) {
+      if (!isMobile && !isSinglePage) {
         if (idx === 0) {
           if (el.currentPage) el.currentPage.textContent = '1';
-        } else if (idx === numPages - 1) {
+        } else if (idx >= numPages - 1) {
           if (el.currentPage) el.currentPage.textContent = `${numPages}`;
         } else {
           const leftP = idx + 1;
@@ -882,24 +897,34 @@
         if (el.currentPage) el.currentPage.textContent = `${pageIdx}`;
       }
 
-      updateContainerTransform();
+      updateContainerTransform(idx);
 
       // Update control disabled states
       const isStart = idx <= 0;
       const isEnd = idx >= numPages - 1;
-      if (el.prevArrow) el.prevArrow.disabled = isStart;
+      if (el.prevArrow) {
+        el.prevArrow.disabled = isStart;
+        el.prevArrow.style.opacity = isStart ? '0' : '1';
+        el.prevArrow.style.pointerEvents = isStart ? 'none' : 'auto';
+      }
+      if (el.nextArrow) {
+        el.nextArrow.disabled = isEnd;
+        el.nextArrow.style.opacity = isEnd ? '0' : '1';
+        el.nextArrow.style.pointerEvents = isEnd ? 'none' : 'auto';
+      }
       if (el.prevBtn) el.prevBtn.disabled = isStart;
       if (el.firstBtn) el.firstBtn.disabled = isStart;
-      if (el.nextArrow) el.nextArrow.disabled = isEnd;
       if (el.nextBtn) el.nextBtn.disabled = isEnd;
       if (el.lastBtn) el.lastBtn.disabled = isEnd;
 
       // Update active thumbnail
       document.querySelectorAll('.fv-thumb-item').forEach((item, i) => {
-        if (i === idx || (!isMobile && idx > 0 && (i === idx || i === idx + 1))) {
-          item.classList.add('active');
+        if (idx === 0) {
+          item.classList.toggle('active', i === 0);
+        } else if (idx >= numPages - 1) {
+          item.classList.toggle('active', i === numPages - 1);
         } else {
-          item.classList.remove('active');
+          item.classList.toggle('active', i === idx || (!isMobile && i === idx + 1));
         }
       });
     }
@@ -914,14 +939,20 @@
     pageFlip.on('changeState', (e) => {
       if (e.data === 'flipping' || e.data === 'user_fold' || e.data === 'fold_corner') {
         playPaperSound();
+        if (el.bookContainer) {
+          el.bookContainer.classList.remove('hz-at-cover', 'hz-at-back');
+          el.bookContainer.style.transform = currentZoom > 1.02 ? `translate3d(${panX}px, ${panY}px, 0px) scale(${currentZoom})` : 'translateX(0)';
+        }
+      } else if (e.data === 'read') {
+        updatePageDisplay(pageFlip.getCurrentPageIndex());
       }
     });
 
     pageFlip.on('init', () => {
-      updatePageDisplay(startPageIndex);
+      updatePageDisplay(safeStartPage);
     });
 
-    updatePageDisplay(startPageIndex);
+    updatePageDisplay(safeStartPage);
 
     // Dock Navigation Buttons
     if (el.prevBtn) el.prevBtn.onclick = () => { playPaperSound('sm'); pageFlip.flipPrev(); };
