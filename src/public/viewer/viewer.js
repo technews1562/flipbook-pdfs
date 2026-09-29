@@ -641,8 +641,17 @@
       currentActivePageFlip = null;
     }
 
-    const container = el.bookContainer;
-    if (!container) return;
+    const viewport = el.viewport || document.getElementById('fvViewport');
+    if (!viewport) return;
+
+    let container = document.getElementById('fvBookContainer');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'fvBookContainer';
+      container.className = 'fv-book-container';
+      viewport.appendChild(container);
+    }
+    el.bookContainer = container;
     container.innerHTML = '';
 
     // Create fresh DOM elements and canvas copies for StPageFlip to own
