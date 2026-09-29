@@ -872,7 +872,7 @@
       flippingTime: 600,
       useMouseEvents: true,
       swipeDistance: 25,
-      showPageCorners: true
+      showPageCorners: false
     });
 
     pageFlip.loadFromHTML(container.querySelectorAll('.st-page'));
@@ -937,7 +937,7 @@
     });
 
     pageFlip.on('changeState', (e) => {
-      if (e.data === 'flipping' || e.data === 'user_fold' || e.data === 'fold_corner') {
+      if (e.data === 'flipping' || e.data === 'user_fold') {
         playPaperSound();
         if (el.bookContainer) {
           el.bookContainer.classList.remove('hz-at-cover', 'hz-at-back');
