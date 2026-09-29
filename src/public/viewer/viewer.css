@@ -331,11 +331,8 @@ a {
   overflow: hidden;
   position: relative;
   box-shadow: var(--fv-shadow-book);
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  will-change: transform;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .st-page-wrapper,
@@ -352,10 +349,10 @@ a {
   height: 100%;
   display: block;
   object-fit: contain;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+  opacity: 1 !important;
+  visibility: visible !important;
+  backface-visibility: visible !important;
+  -webkit-backface-visibility: visible !important;
 }
 
 /* Spine Shadow on Inside Edge */

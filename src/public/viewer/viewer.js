@@ -992,6 +992,24 @@
     });
   }
 
+  // --- Force WebKit & Canvas Layer Repaint ---
+  function forceCanvasRepaint() {
+    if (!el.bookContainer) return;
+    const canvases = el.bookContainer.querySelectorAll('canvas');
+    canvases.forEach(canvas => {
+      canvas.style.opacity = '0.999';
+    });
+    requestAnimationFrame(() => {
+      canvases.forEach(canvas => {
+        canvas.style.opacity = '1';
+        canvas.style.visibility = 'visible';
+      });
+      if (currentActivePageFlip && typeof currentActivePageFlip.update === 'function') {
+        try { currentActivePageFlip.update(); } catch (e) {}
+      }
+    });
+  }
+
   // --- Close All Modals ---
   function closeAllModals() {
     if (el.shareModal) el.shareModal.classList.remove('open');
@@ -1004,12 +1022,8 @@
     if (el.infoBtn) el.infoBtn.classList.remove('active');
 
     // Force GPU canvas re-composite and transform refresh to prevent mobile blanking
-    requestAnimationFrame(() => {
-      updateContainerTransform();
-      if (currentActivePageFlip && typeof currentActivePageFlip.update === 'function') {
-        try { currentActivePageFlip.update(); } catch (e) {}
-      }
-    });
+    updateContainerTransform();
+    forceCanvasRepaint();
   }
 
   // --- Setup Mouse Wheel & Touch Interaction ---
@@ -1204,49 +1218,66 @@
     // Mobile Sheet Grid Actions
     const mSearch = document.getElementById('fvMobileSearchBtn');
     if (mSearch) {
-      mSearch.onclick = () => {
+      mSearch.onclick = (e) => {
+        if (e) e.stopPropagation();
         closeAllModals();
-        if (el.searchBtn) el.searchBtn.click();
+        setTimeout(() => {
+          if (el.searchBtn) el.searchBtn.click();
+        }, 50);
       };
     }
     const mThumbnails = document.getElementById('fvMobileThumbnailsBtn');
     if (mThumbnails) {
-      mThumbnails.onclick = () => {
+      mThumbnails.onclick = (e) => {
+        if (e) e.stopPropagation();
         closeAllModals();
-        if (el.thumbnailsBtn) el.thumbnailsBtn.click();
+        setTimeout(() => {
+          if (el.thumbnailsBtn) el.thumbnailsBtn.click();
+        }, 50);
       };
     }
     const mSound = document.getElementById('fvMobileSoundBtn');
     if (mSound) {
-      mSound.onclick = () => {
+      mSound.onclick = (e) => {
+        if (e) e.stopPropagation();
         if (el.soundBtn) el.soundBtn.click();
       };
     }
     const mTheme = document.getElementById('fvMobileThemeBtn');
     if (mTheme) {
-      mTheme.onclick = () => {
+      mTheme.onclick = (e) => {
+        if (e) e.stopPropagation();
         if (el.themeToggleBtn) el.themeToggleBtn.click();
       };
     }
     const mShare = document.getElementById('fvMobileShareBtn');
     if (mShare) {
-      mShare.onclick = () => {
+      mShare.onclick = (e) => {
+        if (e) e.stopPropagation();
         closeAllModals();
-        if (el.shareBtn) el.shareBtn.click();
+        setTimeout(() => {
+          if (el.shareBtn) el.shareBtn.click();
+        }, 50);
       };
     }
     const mQr = document.getElementById('fvMobileQrBtn');
     if (mQr) {
-      mQr.onclick = () => {
+      mQr.onclick = (e) => {
+        if (e) e.stopPropagation();
         closeAllModals();
-        if (el.qrBtn) el.qrBtn.click();
+        setTimeout(() => {
+          if (el.qrBtn) el.qrBtn.click();
+        }, 50);
       };
     }
     const mInfo = document.getElementById('fvMobileInfoBtn');
     if (mInfo) {
-      mInfo.onclick = () => {
+      mInfo.onclick = (e) => {
+        if (e) e.stopPropagation();
         closeAllModals();
-        if (el.infoBtn) el.infoBtn.click();
+        setTimeout(() => {
+          if (el.infoBtn) el.infoBtn.click();
+        }, 50);
       };
     }
 
