@@ -560,6 +560,7 @@
 
         const page = await pdf.getPage(i);
         const viewport = page.getViewport({ scale: renderScale });
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
 
         const canvas = document.createElement('canvas');
         canvas.width = viewport.width;
@@ -568,12 +569,20 @@
 
         await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
+        let annotations = [];
+        try {
+          annotations = await page.getAnnotations({ intent: 'display' });
+        } catch (annotErr) {}
+
         cachedPages.push({
           pageNumber: i,
           density: (i === 1 || i === numPages) ? 'hard' : 'soft',
           masterCanvas: canvas,
           width: viewport.width,
-          height: viewport.height
+          height: viewport.height,
+          unscaledWidth: unscaledViewport.width,
+          unscaledHeight: unscaledViewport.height,
+          annotations: annotations || []
         });
       }
 
@@ -628,6 +637,121 @@
     }
   }
 
+  // --- Render Page Annotations & Hyperlinks ---
+  function renderPageAnnotationLayer(pDiv, pageData) {
+    if (!pageData || !pageData.annotations || pageData.annotations.length === 0) return;
+
+    const layer = document.createElement('div');
+    layer.className = 'fv-annotation-layer';
+
+    const pageWidth = pageData.unscaledWidth || 600;
+    const pageHeight = pageData.unscaledHeight || 800;
+
+    pageData.annotations.forEach(annot => {
+      if (annot.subtype !== 'Link' || !annot.rect) return;
+
+      const rect = annot.rect; // [x1, y1, x2, y2]
+      const minX = Math.min(rect[0], rect[2]);
+      const maxX = Math.max(rect[0], rect[2]);
+      const minY = Math.min(rect[1], rect[3]);
+      const maxY = Math.max(rect[1], rect[3]);
+
+      const rectWidth = maxX - minX;
+      const rectHeight = maxY - minY;
+      if (rectWidth <= 0 || rectHeight <= 0) return;
+
+      const leftPct = (minX / pageWidth) * 100;
+      const topPct = ((pageHeight - maxY) / pageHeight) * 100;
+      const widthPct = (rectWidth / pageWidth) * 100;
+      const heightPct = (rectHeight / pageHeight) * 100;
+
+      const linkEl = document.createElement('a');
+      linkEl.className = 'fv-link-annotation';
+      linkEl.style.left = `${leftPct.toFixed(3)}%`;
+      linkEl.style.top = `${topPct.toFixed(3)}%`;
+      linkEl.style.width = `${widthPct.toFixed(3)}%`;
+      linkEl.style.height = `${heightPct.toFixed(3)}%`;
+
+      const stopFlip = (e) => { e.stopPropagation(); };
+      linkEl.addEventListener('mousedown', stopFlip);
+      linkEl.addEventListener('touchstart', stopFlip);
+
+      let targetUrl = annot.url || '';
+      let targetDest = annot.dest;
+      let actionName = annot.action;
+
+      if (targetUrl) {
+        let href = targetUrl.trim();
+        if (/^mailto:/i.test(href)) {
+          linkEl.href = href;
+          linkEl.title = `Send Email: ${href.replace(/^mailto:/i, '')}`;
+          linkEl.target = '_self';
+        } else if (/^tel:/i.test(href)) {
+          linkEl.href = href;
+          linkEl.title = `Call Phone: ${href.replace(/^tel:/i, '')}`;
+          linkEl.target = '_self';
+        } else if (/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(href)) {
+          linkEl.href = `mailto:${href}`;
+          linkEl.title = `Send Email: ${href}`;
+          linkEl.target = '_self';
+        } else if (/^\+?[0-9\s\-\(\)]{7,}$/.test(href) && !href.includes('.')) {
+          linkEl.href = `tel:${href.replace(/\s+/g, '')}`;
+          linkEl.title = `Call: ${href}`;
+          linkEl.target = '_self';
+        } else {
+          if (!/^https?:\/\//i.test(href)) href = `https://${href}`;
+          linkEl.href = href;
+          linkEl.target = '_blank';
+          linkEl.rel = 'noopener noreferrer';
+          linkEl.title = `Open link: ${href}`;
+        }
+      } else if (targetDest || actionName === 'GoTo') {
+        linkEl.href = '#';
+        linkEl.title = 'Jump to internal page';
+        linkEl.onclick = async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            let dest = targetDest;
+            if (!currentPdfDoc || !currentActivePageFlip) return;
+            if (typeof dest === 'string') {
+              dest = await currentPdfDoc.getDestination(dest);
+            }
+            if (Array.isArray(dest) && dest.length > 0) {
+              const pageRef = dest[0];
+              let pageIdx;
+              if (typeof pageRef === 'object' && pageRef !== null) {
+                pageIdx = await currentPdfDoc.getPageIndex(pageRef);
+              } else if (typeof pageRef === 'number') {
+                pageIdx = pageRef;
+              }
+              if (pageIdx !== undefined && pageIdx >= 0) {
+                currentActivePageFlip.flip(pageIdx);
+              }
+            }
+          } catch (err) {}
+        };
+      } else if (actionName === 'Named') {
+        linkEl.href = '#';
+        const action = annot.namedAction || '';
+        linkEl.title = action || 'Page Action';
+        linkEl.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!currentActivePageFlip) return;
+          if (action === 'NextPage') currentActivePageFlip.flipNext();
+          else if (action === 'PrevPage') currentActivePageFlip.flipPrev();
+          else if (action === 'FirstPage') currentActivePageFlip.flip(0);
+          else if (action === 'LastPage') currentActivePageFlip.flip(cachedPages.length - 1);
+        };
+      }
+
+      layer.appendChild(linkEl);
+    });
+
+    pDiv.appendChild(layer);
+  }
+
   // --- Build StPageFlip Book Instance with Heyzine-Grade Physics ---
   function buildFlipbookInstance(startPageIndex = 0) {
     if (!cachedPages || cachedPages.length === 0) return;
@@ -672,6 +796,7 @@
       ctx.drawImage(p.masterCanvas, 0, 0);
 
       pDiv.appendChild(freshCanvas);
+      renderPageAnnotationLayer(pDiv, p);
       container.appendChild(pDiv);
     });
 
